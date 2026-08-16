@@ -8,24 +8,24 @@ All three plugins follow the same principle: **no modification of Harness core**
 
 | Plugin | What it does | Where it lives |
 | --- | --- | --- |
-| 📝 **dsh-note** | Native sticky notes: create / history / draggable window / auto-saved drafts | Input toolbar (right of the Full access selector) |
-| 💰 **dsh-api-balance** | API balance + per-turn conversation cost (¥) | Session header actions + each assistant reply |
-| 🗑️ **dsh-session-delete** | "Delete session" action that cleans up session data thoroughly | Session list ⋮ menu |
+| :memo: **dsh-note** | Native sticky notes: create / history / draggable window / auto-saved drafts | Input toolbar (right of the Full access selector) |
+| :moneybag: **dsh-api-balance** | API balance + per-turn conversation cost (¥) | Session header actions + each assistant reply |
+| :wastebasket: **dsh-session-delete** | "Delete session" action that cleans up session data thoroughly | Session list ⋮ menu |
 
-### 📝 dsh-note — Native sticky notes
+### :memo: dsh-note — Native sticky notes
 
 - A small round button in the input toolbar, styled like the surrounding icons (28×28, follows the theme)
 - Opens as a **new note**; clicking **Save** archives it into history (max 30 entries); unsaved content is kept as an auto-saved **draft** when the popup closes
 - The **history window** is an independent popup: freely draggable and resizable, and it **remembers the last position and size**; expanding an entry reveals a **Copy** button; entries can be deleted individually
 - Text limit 16,000 chars; data persists to `$DSH_HOME/storages/dsh-note.json` (atomic writes)
 
-### 💰 dsh-api-balance — API balance & cost
+### :moneybag: dsh-api-balance — API balance & cost
 
 - Balance badge `¥xx.xx`: fetched from the official DeepSeek balance endpoint (60 s server-side cache, click to refresh)
 - Each completed assistant reply (with token usage) shows its per-turn cost `¥x.xxxx`, priced locally in the browser
 - The API key is reused from Harness' credential service (`DEEPSEEK_API_KEY` in `~/.dsh/.credentials.yaml`); the **key never reaches the browser**
 
-### 🗑️ dsh-session-delete — Delete sessions
+### :wastebasket: dsh-session-delete — Delete sessions
 
 - Adds **Delete session** to the session list ⋮ menu, removing the session **thoroughly**: JSONL session log, workspace registration and archive collection
 - Flushes pending data and retires the write path first, then removes in-memory registration and emits `session/disposed`, and only then deletes disk files — no corrupted state is left behind
