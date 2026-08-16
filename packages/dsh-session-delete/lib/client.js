@@ -264,7 +264,6 @@ window.__ModuleLoader__.load({
 			const wrap = official.parentElement.cloneNode(false);
 			const btn = official.cloneNode(false);
 			btn.type = "button";
-			btn.style.color = "var(--dsw-alias-state-error-primary,#f05555)";
 			const icon = document.createElement("span");
 			const iconSpan = official.querySelector("span");
 			icon.className = iconSpan !== null ? iconSpan.className : "";
