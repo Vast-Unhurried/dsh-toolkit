@@ -1,0 +1,4 @@
+# dsh-session-delete bundle patch: inserts the plugin row into the host composition.
+- insert:
+    - id: session-delete
+      name: dsh-session-delete

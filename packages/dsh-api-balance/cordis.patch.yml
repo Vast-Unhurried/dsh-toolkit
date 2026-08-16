@@ -1,0 +1,4 @@
+# dsh-api-balance bundle patch: inserts the plugin row into the host composition.
+- insert:
+    - id: api-balance
+      name: dsh-api-balance

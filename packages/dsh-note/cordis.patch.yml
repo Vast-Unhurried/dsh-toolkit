@@ -1,0 +1,4 @@
+# dsh-note bundle patch: inserts the plugin row into the host composition.
+- insert:
+    - id: dsh-note
+      name: dsh-note

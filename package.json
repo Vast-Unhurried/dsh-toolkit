@@ -1,0 +1,8 @@
+{
+  "name": "dsh-toolkit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DeepSeek Harness 实用工具箱：便签、API 余额与费用、删除会话（monorepo）",
+  "license": "MIT",
+  "scripts": {}
+}
