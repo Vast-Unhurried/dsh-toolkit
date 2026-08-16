@@ -254,33 +254,29 @@ window.__ModuleLoader__.load({
 		/** Inject the delete item into one native session-action menu. */
 		function injectDeleteItem(menu, store, sessions) {
 			const zh = pendingRow === null ? true : pendingRow.zh;
-			const wrap = document.createElement("div");
-			wrap.style.cssText = "margin:2px 4px;";
-			const btn = document.createElement("button");
+			// Clone the native item structure — itemWrap > button.item > itemIcon +
+			// itemLabel — so size, alignment and hover styling match the official
+			// items exactly (their styles live in hashed CSS classes, so cloning
+			// the classes is the only way to inherit them verbatim).
+			const official = menu.querySelector('button[role="menuitem"]');
+			if (official === null || official.parentElement === null) return;
+			const container = official.parentElement.parentElement !== null ? official.parentElement.parentElement : official.parentElement;
+			const wrap = official.parentElement.cloneNode(false);
+			const btn = official.cloneNode(false);
 			btn.type = "button";
-			btn.setAttribute("role", "menuitem");
-			btn.style.cssText = [
-				"display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;border:none;",
-				"background:transparent;padding:6px 8px;border-radius:6px;cursor:pointer;",
-				"color:var(--dsw-alias-state-error-primary,#f05555);",
-				"font-family:var(--dsw-font-sans,system-ui,-apple-system,sans-serif);",
-				"font-size:13px;line-height:18px;text-align:left;",
-			].join("");
-			btn.addEventListener("mouseenter", () => {
-				btn.style.background = "var(--dsw-alias-interactive-bg-hover-danger,rgba(240,85,85,0.12))";
-			});
-			btn.addEventListener("mouseleave", () => {
-				btn.style.background = "transparent";
-			});
+			btn.style.color = "var(--dsw-alias-state-error-primary,#f05555)";
 			const icon = document.createElement("span");
-			icon.style.cssText = "display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:none;";
+			const iconSpan = official.querySelector("span");
+			icon.className = iconSpan !== null ? iconSpan.className : "";
+			icon.style.cssText = "display:inline-flex;align-items:center;justify-content:center;";
 			icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11"/><path d="M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5"/><path d="M4 4.5l.6 8a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4l.6-8"/><path d="M6.5 7.5v3.5"/><path d="M9.5 7.5v3.5"/></svg>';
 			const lab = document.createElement("span");
-			lab.style.cssText = "flex:1;min-width:0;white-space:nowrap;";
+			const labSpan = iconSpan !== null && iconSpan.nextElementSibling !== null && iconSpan.nextElementSibling.tagName === "SPAN" ? iconSpan.nextElementSibling : null;
+			lab.className = labSpan !== null ? labSpan.className : "";
 			lab.textContent = pick(zh, "menu.delete");
 			btn.append(icon, lab);
 			wrap.appendChild(btn);
-			menu.appendChild(wrap);
+			container.appendChild(wrap);
 
 			btn.addEventListener("click", (ev) => {
 				ev.stopPropagation();
