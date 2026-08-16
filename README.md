@@ -12,6 +12,16 @@
 | 💰 **dsh-api-balance** | API 余额 + 每轮对话费用（¥） | 会话头部操作行 + 每条回复操作行 |
 | 🗑️ **dsh-session-delete** | 「删除会话」，彻底清理会话数据 | 会话列表 ⋮ 菜单 |
 
+## 界面预览
+
+![便签与余额](docs/screenshots/screenshot-note-and-balance.png)
+
+*输入框工具行的便签按钮与浮层（新建 / 历史 / 保存）、会话头部余额徽章与每条回复的本轮费用。*
+
+![删除会话菜单](docs/screenshots/screenshot-session-delete.jpg)
+
+*会话列表 ⋮ 菜单中的「删除会话」。*
+
 ### 📝 dsh-note — 原生便签
 
 - 输入框工具行一个与周边图标同款的小圆钮（28×28，随主题自动变色）
