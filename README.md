@@ -1,5 +1,7 @@
 # 🧰 dsh-toolkit — DeepSeek Harness 实用工具箱
 
+[English](README.en.md) | 简体中文
+
 一组**纯增量**的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 原生插件合集：**便签**、**API 余额与费用**、**删除会话**。
 
 三个插件遵循同一原则：**不改动 Harness 核心**——全部通过官方插槽（slot）与独立 API 路由注入，卸载即完全还原。
