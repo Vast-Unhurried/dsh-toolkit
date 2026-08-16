@@ -1,6 +1,6 @@
 # 🧰 dsh-toolkit — DeepSeek Harness 实用工具箱
 
-一组**纯增量**的 [DeepSeek Harness](https://github.com/deepseek-ai/dsh) 原生插件合集：**便签**、**API 余额与费用**、**删除会话**。
+一组**纯增量**的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 原生插件合集：**便签**、**API 余额与费用**、**删除会话**。
 
 三个插件遵循同一原则：**不改动 Harness 核心**——全部通过官方插槽（slot）与独立 API 路由注入，卸载即完全还原。
 
@@ -51,7 +51,7 @@ dsh-toolkit/
 
 ```bash
 # 1. 克隆仓库
-git clone <你的仓库地址>
+git clone https://github.com/Vast-Unhurried/dsh-toolkit.git
 cd dsh-toolkit
 
 # 2. 安装插件（可只装需要的）
