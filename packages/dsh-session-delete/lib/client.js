@@ -251,6 +251,26 @@ window.__ModuleLoader__.load({
 			return null;
 		}
 
+		/** Official ic_ds_trash_outline_16 path (from dsh-client-ui-primitives). */
+		const TRASH_PATH = "M14.4782 4.84067L14.2138 10.1152C14.1102 12.1872 14.067 13.0115 13.3866 13.9607C13.1044 14.3546 12.7498 14.6912 12.3424 14.9535C11.8239 15.2872 11.2415 15.4316 10.5585 15.4998C9.88727 15.5668 9.04946 15.5656 7.99998 15.5656C6.95051 15.5656 6.1127 15.5668 5.44142 15.4998C4.75851 15.4316 4.17602 15.2872 3.65753 14.9535C3.25012 14.6912 2.89559 14.3546 2.61332 13.9607C1.93296 13.0115 1.88979 12.1872 1.78619 10.1152L1.52179 4.84067L2.89006 4.77277L3.15343 10.0463C3.26221 12.2218 3.32452 12.6015 3.72646 13.1624C3.90825 13.4161 4.13686 13.6334 4.39927 13.8023C4.66204 13.9714 5.00263 14.0792 5.57825 14.1367C6.16562 14.1953 6.92298 14.1963 7.99998 14.1963C9.07699 14.1963 9.83434 14.1953 10.4217 14.1367C10.9973 14.0792 11.3379 13.9714 11.6007 13.8023C11.8631 13.6334 12.0917 13.4161 12.2735 13.1624C12.6755 12.6015 12.7378 12.2218 12.8465 10.0463L13.1099 4.77277L14.4782 4.84067ZM5.43011 6.22849H6.7994V11.3909H5.43011V6.22849ZM9.20056 6.22849H10.5699V11.3909H9.20056V6.22849ZM8.53597 0.434431C9.17976 0.434431 9.6522 0.426926 10.0966 0.571258C10.2357 0.616451 10.3717 0.672554 10.502 0.738948C10.9182 0.951107 11.2464 1.29099 11.7015 1.74612L12.4978 2.54136H15.3742V3.91169H0.625732V2.54136H3.50218L4.29845 1.74612C4.75358 1.29099 5.08174 0.951107 5.49801 0.738948C5.62831 0.672554 5.76425 0.616451 5.90334 0.571258C6.34776 0.426926 6.82021 0.434431 7.46399 0.434431H8.53597ZM7.46399 1.80476C6.73208 1.80476 6.51641 1.81187 6.32617 1.87369C6.25545 1.89667 6.18668 1.92533 6.12041 1.95907C5.96398 2.03878 5.82348 2.16253 5.44142 2.54136H10.5585C10.1765 2.16253 10.036 2.03878 9.87955 1.95907C9.81329 1.92533 9.74452 1.89667 9.6738 1.87369C9.48356 1.81187 9.26789 1.80476 8.53597 1.80476H7.46399Z";
+
+		/** Resolve the official hashed `.danger` class from the injected stylesheets. */
+		function resolveDangerClass() {
+			try {
+				for (const sheet of Array.from(document.styleSheets)) {
+					let rules;
+					try { rules = sheet.cssRules; } catch (e) { continue; }
+					for (const rule of rules) {
+						if (typeof rule.cssText === "string" && rule.cssText.includes("interactive-bg-hover-danger")) {
+							const m = /\.([A-Za-z0-9_-]+_danger)\b/.exec(rule.selectorText || "");
+							if (m !== null) return m[1];
+						}
+					}
+				}
+			} catch (e) { /* fall through */ }
+			return null;
+		}
+
 		/** Inject the delete item into one native session-action menu. */
 		function injectDeleteItem(menu, store, sessions) {
 			const zh = pendingRow === null ? true : pendingRow.zh;
@@ -264,16 +284,21 @@ window.__ModuleLoader__.load({
 			const wrap = official.parentElement.cloneNode(false);
 			const btn = official.cloneNode(false);
 			btn.type = "button";
-			// Danger color only — size, alignment and weight still inherit the
-			// official .item class via the cloned className.
-			btn.style.color = "var(--dsw-alias-state-error-primary,#f05555)";
+			// Official danger styling (red text + red icon + red hover fill) via
+			// the hashed .danger class; inline color as fallback if unresolvable.
+			const dangerClass = resolveDangerClass();
+			if (dangerClass !== null) {
+				btn.classList.add(dangerClass);
+			} else {
+				btn.style.color = "var(--dsw-alias-state-error-primary,#f05555)";
+			}
 			const icon = document.createElement("span");
 			const iconSpan = official.querySelector("span");
 			icon.className = iconSpan !== null ? iconSpan.className : "";
 			// The official .itemIcon class sets its own color; force danger red
-			// inline so the svg (stroke: currentColor) renders red too.
+			// inline so the svg (fill: currentColor) renders red too.
 			icon.style.cssText = "display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-state-error-primary,#f05555);";
-			icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h11"/><path d="M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5"/><path d="M4 4.5l.6 8a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4l.6-8"/><path d="M6.5 7.5v3.5"/><path d="M9.5 7.5v3.5"/></svg>';
+			icon.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path fill="currentColor" d="' + TRASH_PATH + '"/></svg>';
 			const lab = document.createElement("span");
 			const labSpan = iconSpan !== null && iconSpan.nextElementSibling !== null && iconSpan.nextElementSibling.tagName === "SPAN" ? iconSpan.nextElementSibling : null;
 			lab.className = labSpan !== null ? labSpan.className : "";
