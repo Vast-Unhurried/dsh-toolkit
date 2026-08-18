@@ -14,7 +14,7 @@ Harness 核心只在模型适配器声明了 `reasoning.efforts` 时才提供推
 
 1. **启动自动声明**（`ensureAllDeclared`，幂等）：遍历 `llm-pi-ai.providers`，为所有未声明 `reasoningEfforts` 的模型写入五档声明（`low…max` 同名字符串映射）；`reasoningEfforts: false` 的模型（用户主动退出，如 grok）与已有自定义声明的模型原样保留；`openai-completions` 路由缺 `compat.supportsReasoningEffort` 时补上。全部模型都退出的路由（如纯 grok 路由）整条跳过。
 2. **默认档位**：`reasoning: max` 写在五档模型所在路由上，官方选择器即默认选中 Max（且不再显示 "Default" 行）。
-3. **不支持的模型**：可以放在**独立路由**（如 `soullens-grok`）且不带 `reasoning` 默认——这样它既不显示档位，请求也保持供应商默认；也可以与五档模型**同路由**（插件已保证路由级默认档不会强加给 `reasoningEfforts: false` 的模型）。
+3. **不支持的模型**：与五档模型**同一供应商混排**即可（如 `soullens` 供应商下 grok-4.6 与 gpt-5.6-luna、deepseek-v4-flash-0731 并存）——插件保证路由级默认档不会强加给 `reasoningEfforts: false` 的模型：它既不显示档位，请求也保持供应商默认。**无需为它单独开一条路由**。
 
 ## 安装
 
