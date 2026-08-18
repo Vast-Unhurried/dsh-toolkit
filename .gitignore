@@ -15,3 +15,17 @@ dist/
 
 # pnpm
 .pnpm-store/
+
+# local secrets & configs (never commit)
+**/.credentials.yaml
+**/credentials.yaml
+**/settings.yaml
+**/settings.local.yaml
+**/state.json
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.secret
