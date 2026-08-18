@@ -1,7 +1,7 @@
 {
   "name": "dsh-reasoning-levels",
   "version": "0.2.3",
-  "description": "第三方模型推理等级插件：启动时为第三方模型自动声明 low / medium / high / xhigh / max 五档推理等级（官方模型选择器直接显示五档），官方模型保持官方三档（Off / High / Max）；reasoningEfforts: false 的模型（如 grok）不显示。",
+  "description": "第三方模型推理等级插件：启动时为第三方模型自动声明 low / medium / high / xhigh / max 五档推理等级（官方模型选择器直接显示五档），官方模型保持官方三档（low / high / max）；reasoningEfforts: false 的模型不显示。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

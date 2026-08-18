@@ -35,8 +35,8 @@ All four plugins follow the same principle: **no modification of Harness core** 
 ### :brain: dsh-reasoning-levels — Third-party reasoning levels
 
 - Offers five tiers — **low / medium / high / xhigh / max** — for third-party (pi-ai) models in the **official model selector**; models with tier support default to **Max** (highlighted on selection; requests go out as Max unless changed)
-- On boot, automatically declares the five tiers for undeclared third-party models (idempotent); supported and unsupported models can **mix inside one vendor** (e.g. grok-4.6 and gpt-5.6-luna both live under Soullens) — `reasoningEfforts: false` models show no tier UI, send no effort parameter, and keep the vendor default
-- Official models keep their official three tiers (Off / High / Max) and are never touched
+- On boot, automatically declares the five tiers for undeclared third-party models (idempotent); supported and unsupported models can **mix inside one vendor** — `reasoningEfforts: false` models show no tier UI, send no effort parameter, and keep the vendor default
+- Official models keep their official three tiers (low / high / max) and are never touched
 - Ships host-side helpers: `getSessionModel` / `setReasoning` / `setModel` / `levels` (model selection, tier diagnostics and switching)
 
 ### :wastebasket: dsh-session-delete — Delete sessions

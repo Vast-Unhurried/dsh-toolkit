@@ -44,9 +44,9 @@
 
 ### :brain: dsh-reasoning-levels — 第三方模型推理等级
 
-- 为第三方模型（pi-ai 供应商，如 Soullens）在**官方模型选择器**中提供五档推理等级：**low / medium / high / xhigh / max**；支持五档的模型默认档位为 **Max**（选中即高亮，未手动选择时按 Max 发送）
-- 启动时自动为未声明的第三方模型写入五档声明（幂等）；同一供应商内可**混排**支持与不支持档位的模型（如 grok-4.6 与 gpt-5.6-luna 同属 Soullens）——`reasoningEfforts: false` 的模型不显示档位、请求不带档位参数、保持供应商默认
-- 官方模型保持官方三档（Off / High / Max），永不触碰
+- 为第三方模型（pi-ai 供应商）在**官方模型选择器**中提供五档推理等级：**low / medium / high / xhigh / max**；支持五档的模型默认档位为 **Max**（选中即高亮，未手动选择时按 Max 发送）
+- 启动时自动为未声明的第三方模型写入五档声明（幂等）；同一供应商内可**混排**支持与不支持档位的模型——`reasoningEfforts: false` 的模型不显示档位、请求不带档位参数、保持供应商默认
+- 官方模型保持官方三档（low / high / max），永不触碰
 - 附带宿主接口 `getSessionModel` / `setReasoning` / `setModel` / `levels`（模型选择、档位诊断与切换）
 
 ### :wastebasket: dsh-session-delete — 删除会话

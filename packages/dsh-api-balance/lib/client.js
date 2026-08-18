@@ -1189,8 +1189,8 @@ window.__ModuleLoader__.load({
         queryLiveModel().then((source) => {
           if (!alive.current || requestId.current !== id) return;
           setActiveSource(source);
-          // Switching between MODELS OF THE SAME PROVIDER (e.g. two models
-          // under soullens) must not change the panel at all: the balance
+          // Switching between MODELS OF THE SAME PROVIDER (two models under
+          // one vendor) must not change the panel at all: the balance
           // and the per-provider 今日消耗 already belong to that vendor.
           // Automatic refreshes (model-change event / polling, quiet=true)
           // therefore keep the panel as-is; an explicit refresh click

@@ -3,7 +3,7 @@
 ## [0.2.3] - 2026-08-18
 
 - 安全加固：API 路由同源检查要求 Host 头为回环地址且 Origin 与 Host 精确一致（防 DNS rebinding 与任意本地端口页面）。
-- 兼容：路由级默认档位（`reasoning: max`）不再强加给 `reasoningEfforts: false` 的模型（grok 等可与五档模型同路由，请求不带档位参数）。
+- 兼容：路由级默认档位（`reasoning: max`）不再强加给 `reasoningEfforts: false` 的模型（可与五档模型同路由，请求不带档位参数）。
 
 ## [0.2.2] - 2026-08-16
 

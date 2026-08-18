@@ -3,7 +3,7 @@
  *
  * The harness core only offers a reasoning-effort UI for models whose adapter
  * declares `reasoning.efforts`. The official DeepSeek route declares three
- * levels (off / high / max); hand-declared third-party pi-ai models declare
+ * levels (low / high / max); hand-declared third-party pi-ai models declare
  * none, so they show no effort control and `session.selectModel` refuses any
  * effort with UNSUPPORTED_REASONING_EFFORT.
  *
@@ -14,7 +14,7 @@
  *      declaration (`low…max`, identity wire mapping) into `llm-pi-ai` for
  *      every user-declared pi-ai model that has no `reasoningEfforts` of its
  *      own, and ensures `compat.supportsReasoningEffort` on `openai-completions`
- *      routes. `reasoningEfforts: false` models (user opt-out, e.g. grok) and
+ *      routes. `reasoningEfforts: false` models (user opt-out) and
  *      models with an existing declaration are left untouched; routes where
  *      every model is opted out are skipped entirely. The write goes through
  *      the settings service, so llm-pi-ai re-registers its routes and the
@@ -276,7 +276,7 @@ async function ensureModelDeclared(ctx, provider, model) {
   if (targetEntry === null) {
     return { ok: false, message: `模型 ${model} 未在供应商 ${provider} 的 models/modelOverrides 中声明，拒绝写入无效模型` };
   }
-  // `reasoningEfforts: false` is the user's explicit opt-out (e.g. grok);
+  // `reasoningEfforts: false` is the user's explicit opt-out;
   // never overwrite it.
   if (targetEntry !== null && typeof targetEntry === 'object' && targetEntry.reasoningEfforts === false) {
     return { ok: false, message: `模型 ${model} 已通过 reasoningEfforts: false 退出推理档位，不会自动声明` };
@@ -347,14 +347,14 @@ export async function ensureAllDeclared(ctx) {
     const models = Array.isArray(route.models) ? route.models : [];
     const overrides = route.modelOverrides !== null && typeof route.modelOverrides === 'object' ? route.modelOverrides : {};
     // A route where every model is opted out (`reasoningEfforts: false`) —
-    // e.g. a grok-only route — is skipped entirely: no declarations, no compat.
+    // is skipped entirely: no declarations, no compat.
     const modelEntries = models.length > 0 ? models : Object.values(overrides);
     const usable = modelEntries.some((entry) => entry !== null && typeof entry === 'object' && entry.reasoningEfforts !== false);
     if (!usable) continue;
     const routeApi = typeof route.api === 'string' ? route.api : undefined;
     const providerPatch = {};
     // A route-wide default is safe only when every model on the route supports
-    // reasoning; mixed routes (for example a grok opt-out) must not inherit it.
+    // reasoning; mixed routes (with an opted-out model) must not inherit it.
     const allModelsSupportReasoning = modelEntries.length > 0
       && modelEntries.every((entry) => entry !== null && typeof entry === 'object' && entry.reasoningEfforts !== false);
     if (allModelsSupportReasoning && route.reasoning === undefined) providerPatch.reasoning = 'max';
@@ -447,7 +447,7 @@ async function handleSetReasoning(ctx, body) {
   const provider = typeof body.provider === 'string' && body.provider.length > 0 ? body.provider : selection.provider;
   const model = typeof body.model === 'string' && body.model.length > 0 ? body.model : selection.model;
   if (provider === OFFICIAL_PROVIDER) {
-    return { ok: false, error: 'official-only', message: '官方模型请使用官方推理等级（Off / High / Max），第三方五档只作用于第三方模型' };
+    return { ok: false, error: 'official-only', message: '官方模型请使用官方推理等级（low / high / max），第三方五档只作用于第三方模型' };
   }
   if (!isPiAiProvider(ctx, provider)) {
     return { ok: false, error: 'not-applicable', message: `供应商 ${provider} 不是 llm-pi-ai 中声明的第三方路由，五档推理等级不适用于它` };

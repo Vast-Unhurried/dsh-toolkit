@@ -4,7 +4,7 @@
  * the five reasoning tiers (low / medium / high / xhigh / max) for every
  * user-declared pi-ai model that has no `reasoningEfforts` of its own, so the
  * OFFICIAL model selector shows the five-tier reasoning pane for third-party
- * models. Models opted out with `reasoningEfforts: false` (e.g. grok) and
+ * models. Models opted out with `reasoningEfforts: false` and
  * models with an existing declaration are left untouched; the official
  * DeepSeek route is never touched.
  * @module dsh-reasoning-levels
