@@ -600,18 +600,23 @@ function beijingDate(timeMs) {
 
 /**
  * Today's recorded token totals, split per provider route (every model, all
- * sessions). The browser badge picks the entry of the session's current
- * provider, so switching vendors shows that vendor's own 今日消耗.
+ * sessions), plus the account-wide `total` — the same figure the DeepSeek
+ * usage page shows (all API calls on the account, cache hits included).
  */
 function todayUsage() {
   const date = beijingDate(Date.now());
   const providers = localState.dailyTokens[date] ?? {};
   const byProvider = {};
+  const total = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   for (const [provider, day] of Object.entries(providers)) {
     if (day === null || typeof day !== 'object' || Array.isArray(day)) continue;
     byProvider[provider] = day;
+    total.input += Number.isFinite(day.input) ? day.input : 0;
+    total.output += Number.isFinite(day.output) ? day.output : 0;
+    total.cacheRead += Number.isFinite(day.cacheRead) ? day.cacheRead : 0;
+    total.cacheWrite += Number.isFinite(day.cacheWrite) ? day.cacheWrite : 0;
   }
-  return { ok: true, date, byProvider };
+  return { ok: true, date, byProvider, total };
 }
 
 /**

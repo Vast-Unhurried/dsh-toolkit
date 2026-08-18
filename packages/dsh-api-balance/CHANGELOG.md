@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.5.4] - 2026-08-18
+
+- 修复：悬停「今日消耗」改为**账户合计**（所有供应商/模型/会话的 token 之和，含缓存命中），与 DeepSeek 官网用量页数字一致；`getTodayUsage` 新增 `total` 字段，按供应商明细仍保留在 `byProvider` 中。
+
 ## [1.5.3] - 2026-08-18
 
 - 修复：官方模型费用重复计费（`reasoning_tokens` 已含在 `completion_tokens` 内，不再重复计价）。

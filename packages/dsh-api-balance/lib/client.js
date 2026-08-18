@@ -1126,6 +1126,7 @@ window.__ModuleLoader__.load({
     function BalanceBadge({ sessionId, liveModel }) {
       const [state, setState] = React.useState({ status: "loading", source: null, sessionId });
       const [todayByProvider, setTodayByProvider] = React.useState(null);
+      const [todayAgg, setTodayAgg] = React.useState(null);
       const [panelOpen, setPanelOpen] = React.useState(false);
       const alive = React.useRef(true);
       const requestId = React.useRef(0);
@@ -1203,14 +1204,20 @@ window.__ModuleLoader__.load({
             setState((current) => ({ ...current, source, sessionId }));
             return;
           }
-          // Today's token consumption per provider (host-side ledger, all
-          // sessions/models), refreshed only when the vendor actually
-          // changed, so the tooltip shows the CURRENT vendor's own 今日消耗.
+          // Today's account-wide token consumption (host-side ledger, all
+          // sessions/models/providers summed — the same figure as the
+          // DeepSeek usage page), refreshed when the vendor changes. The
+          // per-provider map is kept too, in case the tooltip ever needs
+          // breakdown details.
           callApi({ method: "getTodayUsage" }).then((value) => {
             if (!alive.current || requestId.current !== id) return;
-            if (value !== null && typeof value === "object" && value.ok === true
-              && value.byProvider !== null && typeof value.byProvider === "object") {
-              setTodayByProvider(value.byProvider);
+            if (value !== null && typeof value === "object" && value.ok === true) {
+              if (value.byProvider !== null && typeof value.byProvider === "object") {
+                setTodayByProvider(value.byProvider);
+              }
+              if (value.total !== null && typeof value.total === "object") {
+                setTodayAgg(value.total);
+              }
             }
           }).catch(() => { /* keep the previous today totals */ });
           const matched = vendorFor(source);
@@ -1323,17 +1330,24 @@ window.__ModuleLoader__.load({
       // render as loading: never flash the old vendor's balance / 今日消耗.
       const currentSource = staleSession ? null : (state.source ?? null);
       const currentProvider = currentSource === null ? null : currentSource.provider;
-      // The current provider may have NO entry in today's per-provider map
-      // (e.g. a vendor never used today) — `?? null` covers both null and
-      // undefined so the count below never dereferences a missing bucket.
+      // 今日消耗 shows the ACCOUNT-WIDE total (all providers summed, cache
+      // hits included — the same figure as the DeepSeek usage page), falling
+      // back to the current vendor's own entry when the host did not return
+      // a total (older host). `?? null` covers both null and undefined so the
+      // counts never dereference a missing bucket.
       const todayDay = todayByProvider === null || todayByProvider === undefined || currentProvider === null
         ? null
         : todayByProvider[currentProvider] ?? null;
-      const todayTotal = todayDay === null ? null
-        : (Number.isFinite(todayDay.input) ? todayDay.input : 0)
-          + (Number.isFinite(todayDay.output) ? todayDay.output : 0)
-          + (Number.isFinite(todayDay.cacheRead) ? todayDay.cacheRead : 0)
-          + (Number.isFinite(todayDay.cacheWrite) ? todayDay.cacheWrite : 0);
+      const todayTotal = todayAgg !== null && todayAgg !== undefined
+        ? (Number.isFinite(todayAgg.input) ? todayAgg.input : 0)
+          + (Number.isFinite(todayAgg.output) ? todayAgg.output : 0)
+          + (Number.isFinite(todayAgg.cacheRead) ? todayAgg.cacheRead : 0)
+          + (Number.isFinite(todayAgg.cacheWrite) ? todayAgg.cacheWrite : 0)
+        : todayDay === null ? null
+          : (Number.isFinite(todayDay.input) ? todayDay.input : 0)
+            + (Number.isFinite(todayDay.output) ? todayDay.output : 0)
+            + (Number.isFinite(todayDay.cacheRead) ? todayDay.cacheRead : 0)
+            + (Number.isFinite(todayDay.cacheWrite) ? todayDay.cacheWrite : 0);
       const todayText = todayTotal === null ? "" : `今日消耗 ${formatTokens(todayTotal)}`;
       const loadingUnlabelled = staleSession || (state.status === "loading" && state.label === undefined);
       const title = loadingUnlabelled
