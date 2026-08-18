@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-delete",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "为会话右键菜单（⋮）添加「删除会话」：彻底删除会话（JSONL 日志 + 工作区登记），不修改 DeepSeek Harness 核心。",
   "type": "module",
   "main": "lib/index.js",

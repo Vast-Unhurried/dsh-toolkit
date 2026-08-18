@@ -1,0 +1,4 @@
+# dsh-reasoning-levels bundle patch: inserts the plugin row into the host composition.
+- insert:
+    - id: reasoning-levels
+      name: dsh-reasoning-levels

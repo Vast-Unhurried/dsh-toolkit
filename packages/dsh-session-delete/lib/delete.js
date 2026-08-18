@@ -25,7 +25,8 @@
  * @module dsh-session-delete/delete
  */
 import { rm, rmdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { join, sep } from 'node:path';
 
 /** Session ids minted by the harness look like `session-<uuid>`. */
 const SESSION_ID_RE = /^session-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -73,8 +74,10 @@ function projectKey(cwd) {
 
 /** The session-owned directory beneath the project directory. */
 function sessionDir(root, cwd, id) {
-  if (typeof cwd !== 'string' || cwd.length === 0) return undefined;
-  return join(join(root, projectKey(cwd)), encodeSegment(id));
+  // The JSONL backend uses `_no-cwd` for sessions without workspace cwd; do
+  // not report success while leaving that session's artifact behind.
+  const project = typeof cwd === 'string' && cwd.length > 0 ? projectKey(cwd) : '_no-cwd';
+  return join(join(root, project), encodeSegment(id));
 }
 
 /**
@@ -110,74 +113,45 @@ export async function deleteSession(ctx, sessionId) {
   if (header === undefined && live === undefined) {
     throw new Error('会话不存在（可能已被删除）');
   }
-
-  // Deletion is unconditional: subagent lineage (this session being a child,
-  // or having live children) and running state do NOT block deletion. A
-  // running agent keeps its in-memory loop until it naturally finishes, but
-  // its persistence write path is retired below, so it cannot resurrect the
-  // deleted log.
-
-  // 1) Dispose the live half, if any — flush first so no buffered event is
-  // lost, then release the persistence write path, then remove the in-memory
-  // entries, then emit the disposal the core itself would emit.
-  //
-  // The JSONL backend exposes its write orchestration through the public
-  // `coordinator` field (`flush`/`retire` live there, not on the service
-  // itself); fall back to service-level methods when present.
-  const coordinator = persistence.coordinator;
-  const flushLive = typeof coordinator?.flush === 'function' ? coordinator.flush.bind(coordinator) : typeof persistence.flush === 'function' ? persistence.flush.bind(persistence) : undefined;
-  const retireLive = typeof coordinator?.retire === 'function' ? coordinator.retire.bind(coordinator) : typeof persistence.retire === 'function' ? persistence.retire.bind(persistence) : undefined;
-  if (live !== undefined) {
-    if (flushLive !== undefined) {
-      try {
-        await flushLive(live);
-      } catch (error) {
-        throw new Error(`会话数据刷新失败，已取消删除：${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-    if (retireLive !== undefined) {
-      try {
-        retireLive(live);
-      } catch {
-        /* retire is best-effort; the store removal below still proceeds. */
-      }
-    }
-    try {
-      sessions.store.delete(sessionId);
-    } catch {
-      /* store shape is internal; the emit below is the observable part. */
-    }
-    if (agents !== undefined) {
-      try {
-        agents.store.delete(sessionId);
-      } catch {
-        /* ignored — same reason as above. */
-      }
-    }
-    try {
-      ctx.emit('session/disposed', live);
-    } catch {
-      /* disposal listeners are contained by design. */
-    }
+  // Safety invariant: never delete a live/active session. The persistence
+  // service can receive another event after this function returns and recreate
+  // the JSONL directory; attempting to retire/emit it here also races the
+  // core's own scoped disposal path. Ask the user to stop/close it first.
+  if (live !== undefined || agent !== undefined) {
+    throw new Error('运行中的会话不能直接删除，请先停止或关闭会话后重试');
   }
 
-  // 2) Delete the on-disk artifact directory. The JSONL backend exposes the
-  // configured session root as a public `root` field on the service.
+  // Delete only a cold, persisted session. No live store mutation or manual
+  // session/disposed emission is needed; the core has no active agent to
+  // resurrect the artifact.
+
+  // Delete the on-disk artifact directory. The JSONL backend exposes the
+  // configured session root as a public `root` field on the service. A
+  // missing/unresolvable root must fail loudly — silently reporting success
+  // while the logs remain on disk would be worse than refusing.
   const root = typeof persistence.root === 'string' ? persistence.root : persistence.backend?.root;
-  if (typeof root === 'string' && root.length > 0) {
-    const cwd = header !== undefined ? header.cwd : live?.header.cwd;
-    const dir = sessionDir(root, cwd, sessionId);
-    if (dir !== undefined) {
-      await rm(dir, { recursive: true, force: true });
-      // Best-effort: drop the now-empty project directory so no residue stays.
-      const encoded = encodeSegment(sessionId);
-      const project = dir.slice(0, dir.lastIndexOf(encoded));
-      if (project.length > root.length) {
-        try {
-          await rmdir(project);
-        } catch {
-          /* ENOTEMPTY/ENOENT — other sessions live there or it is already gone. */
-        }
+  if (typeof root !== 'string' || root.length === 0) {
+    throw new Error('无法定位会话存储目录，拒绝删除');
+  }
+  {
+    // Resolve the session root itself (a symlinked sessions dir is legal)
+    // and make sure the deletion target stays inside it: a symlinked
+    // project directory must not smuggle the rm outside the root.
+    const realRoot = realpathSync(root);
+    const cwd = header !== undefined ? header.cwd : undefined;
+    const dir = sessionDir(realRoot, cwd, sessionId);
+    if (!dir.startsWith(realRoot + sep)) {
+      throw new Error('会话目录超出存储根目录，拒绝删除');
+    }
+    await rm(dir, { recursive: true, force: true });
+    // Best-effort: drop the now-empty project directory so no residue stays.
+    const encoded = encodeSegment(sessionId);
+    const project = dir.slice(0, dir.lastIndexOf(encoded));
+    if (project.length > realRoot.length) {
+      try {
+        await rmdir(project);
+      } catch {
+        /* ENOTEMPTY/ENOENT — other sessions live there or it is already gone. */
       }
     }
   }

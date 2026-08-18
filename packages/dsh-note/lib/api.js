@@ -84,7 +84,7 @@ function emptyNote() {
   return { text: '', updatedAt: null, history: [] };
 }
 
-/** Sanitize a raw history array into the canonical entry shape. */
+/** Sanitize a raw history array into the canonical entry shape (capped). */
 function parseHistory(raw) {
   const history = [];
   if (!Array.isArray(raw)) return history;
@@ -95,6 +95,7 @@ function parseHistory(raw) {
       text: entry.text,
       updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : null,
     });
+    if (history.length >= MAX_HISTORY) break;
   }
   return history;
 }
@@ -272,6 +273,33 @@ export async function readBody(req) {
   }
 }
 
+/** Reject cross-site browser requests; internal clients may omit Origin. */
+function sameOriginRequest(req) {
+  const headers = req?.headers ?? {};
+  const origin = headers.origin ?? headers.Origin;
+  const fetchSite = headers['sec-fetch-site'] ?? headers['Sec-Fetch-Site'];
+  if (typeof fetchSite === 'string' && fetchSite.toLowerCase() === 'cross-site') return false;
+  if (origin === undefined || origin === '') return true;
+  if (origin === 'null' || typeof origin !== 'string') return false;
+  try {
+    const parsed = new URL(origin);
+    const host = headers.host ?? headers.Host;
+    // DNS-rebinding hardening: the Host header's own hostname must be a
+    // loopback name — otherwise a rebinding page could make its Origin match
+    // Host while the connection actually lands on the harness. The only
+    // accepted request is one whose Origin host:port EXACTLY equals the Host
+    // header (any other loopback page, e.g. localhost:8000, is rejected).
+    if (typeof host !== 'string' || host.length === 0) return false;
+    let hostname = host;
+    try { hostname = new URL(`http://${host}`).hostname; } catch { return false; }
+    if (!['localhost', '127.0.0.1', '[::1]', '::1'].includes(hostname)) return false;
+    return typeof host === 'string' && parsed.host === host
+      && (parsed.protocol === 'http:' || parsed.protocol === 'https:');
+  } catch {
+    return false;
+  }
+}
+
 /** Write a JSON response. */
 export function sendJson(res, status, value) {
   const body = JSON.stringify(value);
@@ -311,6 +339,10 @@ async function handleApi(ctx, body) {
 export function apiHandler(ctx) {
   return async (req, res) => {
     try {
+      if (!sameOriginRequest(req)) {
+        sendJson(res, 403, { ok: false, error: 'forbidden-origin' });
+        return;
+      }
       if (req.method !== 'POST') {
         sendJson(res, 405, { ok: false, error: 'method not allowed' });
         return;

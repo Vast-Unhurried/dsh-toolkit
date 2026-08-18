@@ -78,9 +78,17 @@ window.__ModuleLoader__.load({
 .dan-note-histwin-close{flex:none;width:24px;height:24px;place-items:center;color:var(--dsw-alias-label-tertiary);background:none;border:none;border-radius:6px;cursor:pointer;padding:0;display:grid;font-size:14px;line-height:1}
 .dan-note-histwin-close:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
 .dan-note-histwin-list{flex:1;min-height:0;overflow-y:auto;flex-direction:column;gap:2px;padding-right:2px;display:flex}
-.dan-note-hist-item{flex:none;align-items:center;gap:6px;border-radius:8px;padding:3px 4px 3px 8px;cursor:pointer;display:flex}
+.dan-note-hist-item{flex:none;align-items:center;gap:6px;border-radius:8px;padding:3px 4px 3px 8px;cursor:pointer;display:flex;position:relative}
 .dan-note-hist-item:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .dan-note-hist-item[data-open="true"]{background:var(--dsw-alias-interactive-bg-hover)}
+.dan-note-hist-item[draggable="true"]{cursor:grab;transition:transform .12s ease,box-shadow .12s ease,opacity .12s ease,background .12s ease}
+.dan-note-hist-item[draggable="true"]:active{cursor:grabbing}
+.dan-note-hist-item[data-dragging="1"]{opacity:.55;transform:scale(1.04) rotate(-1.2deg);box-shadow:0 8px 20px rgba(0,0,0,.28);z-index:2;background:var(--dsw-alias-bg-layer-2)}
+.dan-note-hist-item[data-drag-over="1"]{background:var(--dsw-alias-interactive-bg-hover)}
+.dan-note-hist-item[data-drag-side="before"]::before{content:"";position:absolute;left:4px;right:4px;top:-3px;height:2px;border-radius:1px;background:var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary));box-shadow:0 0 6px color-mix(in srgb,var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary)) 55%,transparent)}
+.dan-note-hist-item[data-drag-side="after"]::after{content:"";position:absolute;left:4px;right:4px;bottom:-3px;height:2px;border-radius:1px;background:var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary));box-shadow:0 0 6px color-mix(in srgb,var(--dsw-alias-state-business-primary,var(--dsw-alias-brand-primary)) 55%,transparent)}
+.dan-note-histwin-list[data-just-sorted="1"] .dan-note-hist-item{animation:dsh-note-settle .2s cubic-bezier(.22,1,.36,1)}
+@keyframes dsh-note-settle{0%{transform:translateY(-5px) scale(.985);opacity:.55}60%{transform:translateY(1.5px) scale(1.005)}100%{transform:translateY(0) scale(1);opacity:1}}
 .dan-note-hist-time{flex:none;font-size:11px;line-height:16px;color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums}
 .dan-note-hist-preview{flex:1;min-width:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dan-note-hist-del{flex:none;width:22px;height:22px;place-items:center;color:var(--dsw-alias-label-tertiary);background:none;border:none;border-radius:6px;cursor:pointer;padding:0;display:grid}
@@ -206,6 +214,51 @@ window.__ModuleLoader__.load({
     }
     //#endregion
 
+    //#region history order (drag-to-sort)
+    /** localStorage key remembering the user's manual history order. */
+    const HISTORDER_STORAGE_KEY = "dsh-note.history-order";
+
+    /** Load the saved history order (entry ids, first = top). */
+    function loadHistOrder() {
+      try {
+        const raw = window.localStorage.getItem(HISTORDER_STORAGE_KEY);
+        if (raw === null) return [];
+        const value = JSON.parse(raw);
+        return Array.isArray(value) ? value.filter((id) => typeof id === "string") : [];
+      } catch {
+        return [];
+      }
+    }
+
+    /** Persist the history order (best effort). */
+    function saveHistOrder(order) {
+      try {
+        window.localStorage.setItem(HISTORDER_STORAGE_KEY, JSON.stringify(order));
+      } catch { /* storage unavailable -> order not remembered */ }
+    }
+
+    /**
+     * Apply the saved order to the history rows; entries never seen before
+     * (newly saved notes) keep their natural position at the end.
+     * @param rows - the history rows in natural (host) order.
+     * @param order - saved entry-id order, newest position first.
+     * @returns rows reordered by `order`.
+     */
+    function applyHistOrder(rows, order) {
+      if (rows.length === 0 || order.length === 0) return rows;
+      const position = new Map();
+      order.forEach((id, index) => position.set(id, index));
+      return [...rows].sort((a, b) => {
+        const pa = position.get(a.id);
+        const pb = position.get(b.id);
+        if (pa !== undefined && pb !== undefined) return pa - pb;
+        if (pa !== undefined) return -1;
+        if (pb !== undefined) return 1;
+        return 0;
+      });
+    }
+    //#endregion
+
     //#region component
     /**
      * Sticky-note button + two-column editor. The popover is portal'd to
@@ -228,6 +281,13 @@ window.__ModuleLoader__.load({
       const [histOpen, setHistOpen] = React.useState(false);
       const [copiedId, setCopiedId] = React.useState(null);
       const copyTimerRef = React.useRef(null);
+      const [histOrder, setHistOrder] = React.useState(loadHistOrder);
+      const [dragId, setDragId] = React.useState(null);
+      const [dragOverId, setDragOverId] = React.useState(null);
+      const [dragSide, setDragSide] = React.useState(null);
+      const [justSorted, setJustSorted] = React.useState(false);
+      const dragIdRef = React.useRef(null);
+      const justSortedTimerRef = React.useRef(null);
 
       const histPrefs = React.useMemo(loadHistWinPrefs, []);
       const [histPos, setHistPos] = React.useState(histPrefs.pos);
@@ -246,7 +306,7 @@ window.__ModuleLoader__.load({
       const alive = React.useRef(true);
       const requestId = React.useRef(0);
 
-      React.useEffect(() => () => { alive.current = false; clearTimeout(copyTimerRef.current); }, []);
+      React.useEffect(() => () => { alive.current = false; clearTimeout(copyTimerRef.current); clearTimeout(justSortedTimerRef.current); }, []);
 
       /** Crash-guard: persist the draft (used only when closing with unsaved
        *  content, so a mid-edit refresh never loses it). */
@@ -261,9 +321,13 @@ window.__ModuleLoader__.load({
           cache: "no-store",
         })
           .then((response) => response.json())
-          .then(() => {
+          .then((value) => {
             if (!alive.current || requestId.current !== id) return;
-            dirtyRef.current = false;
+            // Only a real `{ ok: true }` clears the dirty flag; a business
+            // failure must not silently drop the draft.
+            if (value !== null && typeof value === "object" && value.ok === true) {
+              dirtyRef.current = false;
+            }
           })
           .catch(() => {});
       }, []);
@@ -358,8 +422,12 @@ window.__ModuleLoader__.load({
         })
           .then((response) => response.json())
           .then((value) => {
-            if (!alive.current || requestId.current !== reqId) return;
-            setHistBusy(null);
+            if (!alive.current) return;
+            // Always release the delete lock, even if another note request
+            // advanced requestId while deletion was in flight. The previous
+            // stale guard could leave the delete button disabled forever.
+            setHistBusy((current) => current === id ? null : current);
+            if (requestId.current !== reqId) return;
             if (value !== null && typeof value === "object" && value.ok === true) {
               setHistory((current) => current.filter((entry) => entry !== null && typeof entry === "object" && entry.id !== id));
               setExpandedId((current) => current === id ? null : current);
@@ -368,8 +436,9 @@ window.__ModuleLoader__.load({
             }
           })
           .catch(() => {
-            if (!alive.current || requestId.current !== reqId) return;
-            setHistBusy(null);
+            if (!alive.current) return;
+            setHistBusy((current) => current === id ? null : current);
+            if (requestId.current !== reqId) return;
             setHistError("网络错误，删除失败");
           });
       }, [histBusy]);
@@ -466,6 +535,13 @@ window.__ModuleLoader__.load({
         try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* noop */ }
         saveHistWinPrefs(histPosRef.current, histSizeRef.current);
       };
+      /** Finish a move/resize interrupted by pointer cancellation or capture loss. */
+      const onPointerCancel = (event) => {
+        if (dragRef.current === null) return;
+        dragRef.current = null;
+        try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* noop */ }
+        saveHistWinPrefs(histPosRef.current, histSizeRef.current);
+      };
       //#endregion
 
       /** Close the popover (and any open history window); unsaved content
@@ -489,7 +565,12 @@ window.__ModuleLoader__.load({
           setPos({ left, top: r.top - 8 });
         }
         setOpen(true);
-        if (!loadedRef.current) load();
+        // Re-open always reloads: the draft/history may have changed
+        // elsewhere, and a previous close may have left status stuck on
+        // "saving"/"error" (an in-flight commit whose response was dropped).
+        // `load()` resets status to "loading" and re-fetches everything.
+        setStatus("idle");
+        load();
       }, [open, close, load]);
 
       // Click-outside (button + popover are the protected surface) and ESC.
@@ -555,27 +636,99 @@ window.__ModuleLoader__.load({
           updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : "",
         });
       }
-      const histItems = histRows.map((entry) => {
+      const orderedRows = applyHistOrder(histRows, histOrder);
+      const commitOrder = (nextOrder) => {
+        setHistOrder(nextOrder);
+        saveHistOrder(nextOrder);
+      };
+      /** Begin dragging one history row. */
+      const onDragStart = (event, id) => {
+        dragIdRef.current = id;
+        setDragId(id);
+        try {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", id);
+        } catch { /* dataTransfer unavailable -> drag still works locally */ }
+      };
+      const onDragEnd = () => {
+        dragIdRef.current = null;
+        setDragId(null);
+        setDragOverId(null);
+        setDragSide(null);
+      };
+      /** Keep the drag target highlighted while hovering a row, and show the
+       *  insertion side (before/after) based on the pointer position. */
+      const onDragOver = (event, id) => {
+        event.preventDefault();
+        try { event.dataTransfer.dropEffect = "move"; } catch { /* noop */ }
+        if (dragOverId !== id) setDragOverId(id);
+        const rect = event.currentTarget.getBoundingClientRect();
+        const side = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+        if (dragSide !== side) setDragSide(side);
+      };
+      const onDragLeave = (event, id) => {
+        if (dragOverId !== id) return;
+        const related = event.relatedTarget;
+        if (related !== null && related !== undefined && event.currentTarget.contains(related)) return;
+        setDragOverId(null);
+        setDragSide(null);
+      };
+      /** Drop: move the dragged row before/after the target row, then play a
+       *  short settle animation on the list for physical feedback. */
+      const onDrop = (event, id) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setDragOverId(null);
+        setDragSide(null);
+        const fromId = dragIdRef.current;
+        dragIdRef.current = null;
+        setDragId(null);
+        if (fromId === null || fromId === id) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const after = event.clientY > rect.top + rect.height / 2;
+        const ids = orderedRows.map((row) => row.id);
+        const fromIndex = ids.indexOf(fromId);
+        if (fromIndex < 0) return;
+        ids.splice(fromIndex, 1);
+        const targetIndex = ids.indexOf(id);
+        if (targetIndex < 0) return;
+        ids.splice(after ? targetIndex + 1 : targetIndex, 0, fromId);
+        commitOrder(ids);
+        setJustSorted(true);
+        clearTimeout(justSortedTimerRef.current);
+        justSortedTimerRef.current = setTimeout(() => setJustSorted(false), 220);
+      };
+      const histItems = orderedRows.map((entry) => {
         const isOpen = expandedId === entry.id;
         const copied = copiedId === entry.id;
         const row = React.createElement(
           "div",
           {
+            key: entry.id,
             className: "dan-note-hist-item",
             "data-open": isOpen || undefined,
+            "data-dragging": dragId === entry.id || undefined,
+            "data-drag-over": dragOverId === entry.id || undefined,
+            "data-drag-side": dragOverId === entry.id && dragSide !== null ? dragSide : undefined,
+            draggable: true,
+            title: isOpen ? "收起" : "点击查看 · 拖动排序",
             onClick: () => setExpandedId(isOpen ? null : entry.id),
-            title: isOpen ? "收起" : "点击查看",
+            onDragStart: (event) => onDragStart(event, entry.id),
+            onDragEnd,
+            onDragOver: (event) => onDragOver(event, entry.id),
+            onDragLeave: (event) => onDragLeave(event, entry.id),
+            onDrop: (event) => onDrop(event, entry.id),
           },
           React.createElement("span", { className: "dan-note-hist-time", title: entry.updatedAt }, formatTime(entry.updatedAt)),
           React.createElement("span", { className: "dan-note-hist-preview", title: entry.text }, entry.text),
-          isOpen ? React.createElement("button", {
+          React.createElement("button", {
             type: "button",
             className: "dan-note-hist-copy",
             "data-copied": copied || undefined,
             "aria-label": copied ? "已复制" : "复制内容",
             title: copied ? "已复制" : "复制内容",
             onClick: (event) => { event.stopPropagation(); copyEntry(entry.id, entry.text); },
-          }, copied ? CHECK_ICON : COPY_ICON) : null,
+          }, copied ? CHECK_ICON : COPY_ICON),
           React.createElement("button", {
             type: "button",
             className: "dan-note-hist-del",
@@ -639,6 +792,8 @@ window.__ModuleLoader__.load({
             onPointerDown: onTitleDown,
             onPointerMove: onTitleMove,
             onPointerUp: onTitleUp,
+            onPointerCancel,
+            onLostPointerCapture: onPointerCancel,
           },
             React.createElement("span", null, `历史便签${history.length > 0 ? `（${history.length}）` : ""}`),
             histError !== null ? React.createElement("span", { className: "dan-note-err" }, histError) : null,
@@ -653,12 +808,14 @@ window.__ModuleLoader__.load({
           ),
           history.length === 0
             ? React.createElement("div", { className: "dan-note-hist-empty" }, "暂无历史")
-            : React.createElement("div", { className: "dan-note-histwin-list" }, histItems),
+            : React.createElement("div", { className: "dan-note-histwin-list", "data-just-sorted": justSorted || undefined }, histItems),
           React.createElement("div", {
             className: "dan-note-histwin-resize",
             onPointerDown: onResizeDown,
             onPointerMove: onResizeMove,
             onPointerUp: onResizeUp,
+            onPointerCancel,
+            onLostPointerCapture: onPointerCancel,
           })
         ),
         document.body

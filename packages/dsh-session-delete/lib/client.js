@@ -234,20 +234,9 @@ window.__ModuleLoader__.load({
 				if (rowTitle === row.title) candidates.push(id);
 			}
 			if (candidates.length === 1) return candidates[0];
-			if (candidates.length === 0) return null;
-			// Duplicate titles (e.g. several blank sessions): disambiguate by DOM
-			// position among the same-title rows.
-			const clickedRow = row.btn !== null && row.btn !== undefined ? row.btn.closest('[role="treeitem"]') : null;
-			const sameTitleRows = [];
-			document.querySelectorAll('[role="treeitem"]').forEach((r) => {
-				const b = r.querySelector('button[aria-label]');
-				if (b === null) return;
-				const label = b.getAttribute("aria-label") || "";
-				const m = ACTIONS_ZH.exec(label) || ACTIONS_EN.exec(label);
-				if (m !== null && m[1] === row.title) sameTitleRows.push(r);
-			});
-			const idx = sameTitleRows.indexOf(clickedRow);
-			if (idx >= 0 && idx < candidates.length) return candidates[idx];
+			// Never guess when titles collide. DOM order and the session-store
+			// order can diverge (archived/subagent rows are also interleaved), so
+			// guessing could permanently delete the wrong session.
 			return null;
 		}
 

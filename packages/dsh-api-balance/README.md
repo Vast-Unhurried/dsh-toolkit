@@ -1,52 +1,46 @@
-# dsh-api-balance
+# dsh-api-balance — API 余额与每轮费用显示插件
 
-DeepSeek Harness 原生风格的 API 余额与每轮费用显示插件（人民币）。
+DeepSeek Harness 原生风格的 **API 余额** 与 **每轮费用** 显示插件（人民币），并在会话头部提供**模型计费管理**。
 
-- **余额**：显示在会话消息区右上角操作行（与任务列表、导出等图标同一行），格式 `¥xx.xx`，点击可刷新，60 秒内服务器缓存。
-- **本轮费用**：每条 assistant 回复完成（带 token 用量）后，在其操作图标行内显示 `¥x.xxxx`。
-- **位置与颜色**：均使用 DSH 主题设计变量（`--dsw-alias-label-tertiary` 等），与附近图标完全一致，自动跟随明/暗主题。
-- **不影响核心**：只通过官方 slot（`conversation.session.header.actions`、`conversation.chat.assistant-actions`）注入只读 UI；宿主仅新增一个 `/plugins/api-balance/api` 路由，不修改、不订阅、不写入任何核心状态。
+- **余额徽章**：会话头部操作行。显示**当前模型所属供应商**的余额，格式 `余额（供应商）¥xx.xx`；DeepSeek 官方路由显示 `余额（高峰）` / `余额（闲时）`（按北京时间，与官网峰谷窗口 9:00–12:00、14:00–18:00 对齐）
+  - 余额来源三种：**DeepSeek 官方接口**（`GET https://api.deepseek.com/user/balance`）、**第三方余额接口**（URL + 凭据名）、**本地记账**（初始总金额 − 已扣费用）
+  - **单击刷新**（官方接口绕过 60 秒缓存；本地记账实时重算）；**双击**打开「模型计费管理」
+- **模型计费管理**：双击徽章打开。可添加 / 编辑 / 删除**供应商**（一个供应商挂多个模型，共用同一余额池），为第三方模型设置独立的输入 / 输出 / 缓存读 / 缓存写费率（元/百万 tokens）
+- **本轮费用**：每条 assistant 回复完成（带 token 用量）后，在其操作图标旁显示 `本轮 ¥x.xxxx`；按官方峰谷价或自定义费率精确计价（缓存命中分开计价）；**悬停**显示 `缓存命中率 X% 消耗 X K/M tok`
+- **今日消耗**：悬停徽章显示**当日（北京时间）该供应商消耗的 token**（K tok / M tok），按供应商分别统计、跨会话累计
+- **切换联动**：切换会话或切换供应商模型时，徽章立即切换为该供应商的余额与今日消耗；同供应商内切换模型保持不变
 
-## 余额来源
+## 计价
 
-- 调用 DeepSeek 官方余额接口 `GET https://api.deepseek.com/user/balance`（[官方文档](https://api-docs.deepseek.com/zh-cn/api/get-user-balance/)）。
-- API Key 复用 Harness 的凭据服务（`~/.dsh/.credentials.yaml` 的 `DEEPSEEK_API_KEY`，即模型设置页写入的那个）。**Key 不会发送到浏览器**。
-- 未配置 Key 或网络失败时，徽章显示 `¥ —`，悬停可见原因；不影响任何功能。
+- **DeepSeek 官方（deepseek-v4-flash）**：峰谷价（2026-08-17 生效）：
 
-## 费用计算
+| 时段 | 输入（缓存未命中） | 输入（缓存命中） | 输出（含 reasoning） |
+| --- | --- | --- | --- |
+| 高峰（9:00–12:00、14:00–18:00 北京时间） | 3.0 | 0.10 | 9.0 |
+| 闲时（其余时段） | 1.5 | 0.05 | 4.5 |
 
-- 每条回复的 token 用量直接取自 DSH 会话快照（精确到每条 `assistant/message` 的 `usage`），在浏览器本地计价。
-- 计费口径与官方一致：输入按「缓存命中 / 未命中」分档，`reasoningTokens` 与输出同价。
-- 默认定价 = **deepseek-v4-flash 现行官方价**（2026-08-13 抓取自[官方定价页](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)）：
+  单位：元 / 百万 tokens。
+- **第三方供应商**：按「模型计费管理」中配置的费率计价（未配置的模型不参与本地记账）。
 
-| 项目 | 价格（元/百万 tokens） |
-| --- | --- |
-| 输入（缓存命中） | 0.02 |
-| 输入（缓存未命中） | 1.00 |
-| 输出（含 reasoning） | 2.00 |
+## 数据与 API
 
-### 修改定价
-
-编辑 `lib/client.js` 顶部的 `PRICING` 常量后重启服务器（Ctrl+C → `dsh web` → 浏览器 Ctrl+Shift+R）。
-
-> ⚠️ DeepSeek 将于 **2026-08-17 00:00（北京时间）** 起执行峰谷定价：
-> - flash：空闲 0.05 / 1.5 / 4.5，高峰（9:00-12:00、14:00-18:00）0.10 / 3.0 / 9.0
-> - pro：空闲 0.15 / 4.5 / 13.5，高峰 0.30 / 9.0 / 27.0
->
-> 届时请按所用模型更新 `PRICING`（如需区分峰谷可自行扩展）。
+- 路由：`POST /plugins/api-balance/api`，方法 `getBalance` / `getActiveModel` / `getSessionModel` / `getLocalBalance` / `getTodayUsage` / `syncProviders` / `resetLocalBalance` / `ping`
+- 供应商配置与费率保存在浏览器 localStorage，并同步到宿主 `$DSH_HOME/plugins/dsh-api-balance/state.json`（本地记账账本 + 按供应商的每日 token 统计）
+- API Key 复用 Harness 凭据服务（`~/.dsh/.credentials.yaml` 的 `DEEPSEEK_API_KEY`），**Key 永不进入浏览器**
+- 宿主订阅全局会话事件流为第三方本地记账扣费；官方模型的用量也计入「今日消耗」统计
 
 ## 安装 / 卸载
 
 ```bash
-# 在 dsh-toolkit 仓库根目录执行
 dsh plugin --profile web add file:./packages/dsh-api-balance
-# 卸载（会一并清理依赖与 bundles 登记）
+# 卸载
 dsh plugin --profile web remove dsh-api-balance
 ```
 
-安装后需重启服务器生效（宿主路由 + 客户端 bundle 均需重启后加载）。
+重启 dsh 服务后浏览器硬刷新。卸载后本地记账数据保留在 `$DSH_HOME/plugins/dsh-api-balance/state.json`，如需彻底清除手动删除。
 
-## 已知限制
+## 安全
 
-- 费用为按官方价的估算值，未含峰谷差价；实际扣费以 DeepSeek 账单为准。
-- 只有「已完成且带 usage」的回复显示费用；正在流式输出 / 无 usage 的回复不显示。
+- 仅 POST + 同源校验（Host 回环 + Origin 精确匹配），拒绝跨站 / DNS rebinding
+- 凭据只在宿主侧解析；请求体 64 KiB 上限；响应 no-store
+- 客户端纯 React 渲染，无 innerHTML / eval；不改动 Harness 核心
