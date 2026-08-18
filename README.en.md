@@ -10,7 +10,7 @@ All four plugins follow the same principle: **no modification of Harness core** 
 
 | Plugin | What it does | Where it lives |
 | --- | --- | --- |
-| :memo: **dsh-note** | Native sticky notes: create / history / draggable window / auto-saved drafts | Input toolbar (right of the Full access selector) |
+| :memo: **dsh-note** | Native sticky notes: create / history / draggable window / double-click history entries to edit with autosave | Input toolbar (right of the Full access selector) |
 | :moneybag: **dsh-api-balance** | API balance + per-turn cost + today's usage (¥ / tokens, peak-off-peak pricing, per-vendor stats) | Session header actions + each assistant reply |
 | :brain: **dsh-reasoning-levels** | Five-tier reasoning effort (low / medium / high / xhigh / max) for third-party models | Official model selector |
 | :wastebasket: **dsh-session-delete** | "Delete session" action that cleans up session data thoroughly | Session list ⋮ menu |
@@ -20,6 +20,7 @@ All four plugins follow the same principle: **no modification of Harness core** 
 - A small round button in the input toolbar, styled like the surrounding icons (28×28, follows the theme)
 - Opens as a **new note**; clicking **Save** archives it into history (max 30 entries); unsaved content is kept as an auto-saved **draft** when the popup closes
 - The **history window** is an independent popup: freely draggable and resizable, and it **remembers the last position and size**; expanding an entry reveals a **Copy** button; entries can be deleted individually
+- **Double-click an expanded entry to edit it inline**: autosaves ~0.6 s after you stop typing (shows "已自动保存"); the entry keeps its position and no keystrokes are lost; press ESC to finish editing
 - Text limit 16,000 chars; data persists to `$DSH_HOME/storages/dsh-note.json` (atomic writes, serialized)
 
 ### :moneybag: dsh-api-balance — API balance & cost
