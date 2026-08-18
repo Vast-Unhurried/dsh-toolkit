@@ -28,7 +28,7 @@ All four plugins follow the same principle: **no modification of Harness core** 
 - **Balance badge** in the session header: shows the balance of the current model's vendor — the official DeepSeek balance endpoint (labeled **高峰 / 闲时** peak/off-peak by Beijing time, aligned with the official 9:00–12:00 / 14:00–18:00 windows), a third-party balance endpoint, or local accounting (total − spent)
 - **Vendor manager** (double-click the badge): add / edit / delete vendors, each holding multiple models sharing one balance pool; per-model rates for input / output / cache-read / cache-write (CNY per million tokens)
 - **Per-turn cost**: each finished assistant reply shows `本轮 ¥x.xxxx`, priced with official peak/off-peak rates or custom rates; hover shows **cache hit rate** and consumed tokens (K/M tok)
-- **Today's usage**: hovering the badge shows today's **account-wide** token consumption (Beijing time; all vendors / models / sessions summed, cache hits included), matching the DeepSeek usage page
+- **Today's usage**: hovering the badge shows today's (Beijing time) consumption of the **current vendor** — official DeepSeek routes and their derived channels (e.g. vision-toolkit) are merged into one vendor, matching the DeepSeek usage page; third-party vendors are tracked separately and switch along with the badge
 - **Switch-aware**: switching sessions or switching to another vendor's model updates the badge immediately; switching models within the same vendor keeps it unchanged
 - The API key is reused from Harness' credential service (`DEEPSEEK_API_KEY` in `~/.dsh/.credentials.yaml`); the **key never reaches the browser**
 

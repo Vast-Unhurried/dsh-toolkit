@@ -599,24 +599,47 @@ function beijingDate(timeMs) {
 }
 
 /**
+ * Map a provider route name to its vendor group. The official DeepSeek
+ * routes — `deepseek-official` itself and any route derived from it (e.g.
+ * `vision-toolkit-deepseek-official`, which also calls the same official
+ * account) — share ONE vendor group so their 今日消耗 adds up to exactly
+ * what the DeepSeek usage page shows. Every other route is its own vendor.
+ * @param provider - the route-level provider name from a session event.
+ * @returns the vendor group key.
+ */
+function vendorOf(provider) {
+  if (typeof provider === 'string' && (provider === 'deepseek-official' || provider.endsWith('-deepseek-official'))) {
+    return 'deepseek-official';
+  }
+  return provider;
+}
+
+/**
  * Today's recorded token totals, split per provider route (every model, all
- * sessions), plus the account-wide `total` — the same figure the DeepSeek
- * usage page shows (all API calls on the account, cache hits included).
+ * sessions) and merged per vendor group (`byVendor`). The badge shows the
+ * CURRENT vendor's merged total — official DeepSeek plus its derived routes
+ * like vision-toolkit — which matches the DeepSeek usage page figure, while
+ * third-party vendors keep their own totals. `vendorOfProvider` lets the
+ * browser resolve the current provider route to its vendor group.
  */
 function todayUsage() {
   const date = beijingDate(Date.now());
   const providers = localState.dailyTokens[date] ?? {};
   const byProvider = {};
-  const total = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const byVendor = {};
+  const vendorOfProvider = {};
   for (const [provider, day] of Object.entries(providers)) {
     if (day === null || typeof day !== 'object' || Array.isArray(day)) continue;
     byProvider[provider] = day;
-    total.input += Number.isFinite(day.input) ? day.input : 0;
-    total.output += Number.isFinite(day.output) ? day.output : 0;
-    total.cacheRead += Number.isFinite(day.cacheRead) ? day.cacheRead : 0;
-    total.cacheWrite += Number.isFinite(day.cacheWrite) ? day.cacheWrite : 0;
+    const vendor = vendorOf(provider);
+    vendorOfProvider[provider] = vendor;
+    const merged = byVendor[vendor] ?? (byVendor[vendor] = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+    merged.input += Number.isFinite(day.input) ? day.input : 0;
+    merged.output += Number.isFinite(day.output) ? day.output : 0;
+    merged.cacheRead += Number.isFinite(day.cacheRead) ? day.cacheRead : 0;
+    merged.cacheWrite += Number.isFinite(day.cacheWrite) ? day.cacheWrite : 0;
   }
-  return { ok: true, date, byProvider, total };
+  return { ok: true, date, byProvider, byVendor, vendorOfProvider };
 }
 
 /**

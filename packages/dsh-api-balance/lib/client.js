@@ -1125,8 +1125,9 @@ window.__ModuleLoader__.load({
      */
     function BalanceBadge({ sessionId, liveModel }) {
       const [state, setState] = React.useState({ status: "loading", source: null, sessionId });
-      const [todayByProvider, setTodayByProvider] = React.useState(null);
-      const [todayAgg, setTodayAgg] = React.useState(null);
+      // Today's usage payload from `getTodayUsage`: `byProvider` (per route),
+      // `byVendor` (per vendor group) and `vendorOfProvider` (route → group).
+      const [todayData, setTodayData] = React.useState(null);
       const [panelOpen, setPanelOpen] = React.useState(false);
       const alive = React.useRef(true);
       const requestId = React.useRef(0);
@@ -1204,20 +1205,16 @@ window.__ModuleLoader__.load({
             setState((current) => ({ ...current, source, sessionId }));
             return;
           }
-          // Today's account-wide token consumption (host-side ledger, all
-          // sessions/models/providers summed — the same figure as the
-          // DeepSeek usage page), refreshed when the vendor changes. The
-          // per-provider map is kept too, in case the tooltip ever needs
-          // breakdown details.
+          // Today's token consumption for the CURRENT vendor group (host-side
+          // ledger, all sessions/models): official DeepSeek routes — e.g.
+          // deepseek-official and vision-toolkit-deepseek-official — are
+          // merged into one vendor by the host, so the figure matches the
+          // DeepSeek usage page; third-party vendors stay separate. Refreshed
+          // only when the vendor actually changes.
           callApi({ method: "getTodayUsage" }).then((value) => {
             if (!alive.current || requestId.current !== id) return;
             if (value !== null && typeof value === "object" && value.ok === true) {
-              if (value.byProvider !== null && typeof value.byProvider === "object") {
-                setTodayByProvider(value.byProvider);
-              }
-              if (value.total !== null && typeof value.total === "object") {
-                setTodayAgg(value.total);
-              }
+              setTodayData(value);
             }
           }).catch(() => { /* keep the previous today totals */ });
           const matched = vendorFor(source);
@@ -1330,24 +1327,30 @@ window.__ModuleLoader__.load({
       // render as loading: never flash the old vendor's balance / 今日消耗.
       const currentSource = staleSession ? null : (state.source ?? null);
       const currentProvider = currentSource === null ? null : currentSource.provider;
-      // 今日消耗 shows the ACCOUNT-WIDE total (all providers summed, cache
-      // hits included — the same figure as the DeepSeek usage page), falling
-      // back to the current vendor's own entry when the host did not return
-      // a total (older host). `?? null` covers both null and undefined so the
-      // counts never dereference a missing bucket.
-      const todayDay = todayByProvider === null || todayByProvider === undefined || currentProvider === null
+      // 今日消耗 shows the CURRENT VENDOR group's total (the host merges
+      // official DeepSeek routes like vision-toolkit-deepseek-official into
+      // deepseek-official, matching the DeepSeek usage page; third-party
+      // vendors each keep their own total). Falls back to the current route's
+      // own entry when the host did not return vendor grouping (older host).
+      // `?? null` covers both null and undefined so the counts never
+      // dereference a missing bucket.
+      const vendorKey = currentProvider === null || todayData === null || todayData === undefined
         ? null
-        : todayByProvider[currentProvider] ?? null;
-      const todayTotal = todayAgg !== null && todayAgg !== undefined
-        ? (Number.isFinite(todayAgg.input) ? todayAgg.input : 0)
-          + (Number.isFinite(todayAgg.output) ? todayAgg.output : 0)
-          + (Number.isFinite(todayAgg.cacheRead) ? todayAgg.cacheRead : 0)
-          + (Number.isFinite(todayAgg.cacheWrite) ? todayAgg.cacheWrite : 0)
-        : todayDay === null ? null
-          : (Number.isFinite(todayDay.input) ? todayDay.input : 0)
-            + (Number.isFinite(todayDay.output) ? todayDay.output : 0)
-            + (Number.isFinite(todayDay.cacheRead) ? todayDay.cacheRead : 0)
-            + (Number.isFinite(todayDay.cacheWrite) ? todayDay.cacheWrite : 0);
+        : todayData.vendorOfProvider !== null && typeof todayData.vendorOfProvider === "object"
+          ? todayData.vendorOfProvider[currentProvider] ?? currentProvider
+          : currentProvider;
+      const todayDay = vendorKey === null
+        ? null
+        : todayData.byVendor !== null && typeof todayData.byVendor === "object"
+          ? todayData.byVendor[vendorKey] ?? null
+          : todayData.byProvider !== null && typeof todayData.byProvider === "object"
+            ? todayData.byProvider[vendorKey] ?? null
+            : null;
+      const todayTotal = todayDay === null ? null
+        : (Number.isFinite(todayDay.input) ? todayDay.input : 0)
+          + (Number.isFinite(todayDay.output) ? todayDay.output : 0)
+          + (Number.isFinite(todayDay.cacheRead) ? todayDay.cacheRead : 0)
+          + (Number.isFinite(todayDay.cacheWrite) ? todayDay.cacheWrite : 0);
       const todayText = todayTotal === null ? "" : `今日消耗 ${formatTokens(todayTotal)}`;
       const loadingUnlabelled = staleSession || (state.status === "loading" && state.label === undefined);
       const title = loadingUnlabelled

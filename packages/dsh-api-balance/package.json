@@ -1,6 +1,6 @@
 {
   "name": "dsh-api-balance",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "在会话消息区显示 DeepSeek API 余额（人民币）与每轮对话费用：余额徽章在会话头部操作行，本轮费用在每条回复的操作图标旁；不改动 DeepSeek Harness 核心。",
   "type": "module",
   "main": "lib/index.js",

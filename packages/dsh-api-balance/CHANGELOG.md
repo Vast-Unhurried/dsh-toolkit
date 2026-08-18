@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.5.5] - 2026-08-18
+
+- 恢复「今日消耗」按**当前供应商**显示（撤销 1.5.4 的账户合计）；同时将 DeepSeek 官方派生路由（如 `vision-toolkit-deepseek-official`）与 `deepseek-official` **合并为同一供应商组**——官方通道的今日消耗与官网用量页数字一致，第三方供应商仍各自独立统计。`getTodayUsage` 返回 `byVendor` / `vendorOfProvider`（供应商分组与路由→分组映射），`byProvider` 明细保留。
+
 ## [1.5.4] - 2026-08-18
 
 - 修复：悬停「今日消耗」改为**账户合计**（所有供应商/模型/会话的 token 之和，含缓存命中），与 DeepSeek 官网用量页数字一致；`getTodayUsage` 新增 `total` 字段，按供应商明细仍保留在 `byProvider` 中。
