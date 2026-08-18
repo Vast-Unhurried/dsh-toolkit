@@ -24,9 +24,12 @@
  *       movable (drag its title bar) and resizable (drag its bottom-right
  *       handle); its last position/size is remembered in localStorage and
  *       restored on the next open. Clicking an entry expands its full text
- *       (with a copy button); each entry can be deleted individually via
- *       `deleteHistory`. ESC closes the history window first, then the
- *       editor; clicking outside the editor closes both.
+ *       (with a copy button); double-clicking the expanded text switches it
+ *       into an inline editor that autosaves (debounced `updateHistory`) —
+ *       the entry keeps its position, only text and timestamp change. Each
+ *       entry can be deleted individually via `deleteHistory`. ESC closes
+ *       the history window first, then the editor; clicking outside the
+ *       editor closes both.
  *
  * All failures render as status lines inside the popover — the native UI is
  * never touched.
@@ -97,7 +100,12 @@ window.__ModuleLoader__.load({
 .dan-note-hist-copy{flex:none;width:22px;height:22px;place-items:center;color:var(--dsw-alias-label-tertiary);background:none;border:none;border-radius:6px;cursor:pointer;padding:0;display:grid}
 .dan-note-hist-copy:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
 .dan-note-hist-copy[data-copied="true"]{color:var(--dsw-alias-state-business-primary)}
-.dan-note-hist-body{flex:none;border-radius:8px;background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);margin:0 4px 4px 8px;padding:6px 8px;font-size:12px;line-height:18px;white-space:pre-wrap;word-break:break-word;max-height:140px;overflow-y:auto}
+.dan-note-hist-body{flex:none;border-radius:8px;background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);margin:0 4px 4px 8px;padding:6px 8px;font-size:12px;line-height:18px;white-space:pre-wrap;word-break:break-word;max-height:140px;overflow-y:auto;cursor:text}
+.dan-note-hist-body-edit{background:transparent;padding:0;display:flex;flex-direction:column;gap:4px;max-height:320px}
+.dan-note-hist-edit{box-sizing:border-box;width:100%;min-height:96px;max-height:280px;resize:vertical;background:transparent;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:6px 8px;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;line-height:18px;outline:none}
+.dan-note-hist-edit:focus{border-color:var(--dsw-alias-border-l3);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-border-l3) 30%,transparent)}
+.dan-note-hist-edit::placeholder{color:var(--dsw-alias-label-dimmed)}
+.dan-note-hist-edit-status{font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary);padding:0 2px 2px}
 .dan-note-hist-empty{font-size:12px;line-height:18px;color:var(--dsw-alias-label-dimmed)}
 `;
     //#endregion
@@ -289,6 +297,20 @@ window.__ModuleLoader__.load({
       const dragIdRef = React.useRef(null);
       const justSortedTimerRef = React.useRef(null);
 
+      // Inline history-entry editing (double-click the expanded text to edit,
+      // debounced autosave via updateHistory).
+      const [editId, setEditId] = React.useState(null);
+      const [editText, setEditText] = React.useState("");
+      const [editStatus, setEditStatus] = React.useState(null);
+      const [editError, setEditError] = React.useState(null);
+      const editIdRef = React.useRef(null);
+      const editTextRef = React.useRef("");
+      const editTimerRef = React.useRef(null);
+      const editSeqRef = React.useRef(0);
+      const editSavingRef = React.useRef(false);
+      const editDirtyRef = React.useRef(false);
+      const editSavedTimerRef = React.useRef(null);
+
       const histPrefs = React.useMemo(loadHistWinPrefs, []);
       const [histPos, setHistPos] = React.useState(histPrefs.pos);
       const [histSize, setHistSize] = React.useState(histPrefs.size);
@@ -306,7 +328,13 @@ window.__ModuleLoader__.load({
       const alive = React.useRef(true);
       const requestId = React.useRef(0);
 
-      React.useEffect(() => () => { alive.current = false; clearTimeout(copyTimerRef.current); clearTimeout(justSortedTimerRef.current); }, []);
+      React.useEffect(() => () => {
+        alive.current = false;
+        clearTimeout(copyTimerRef.current);
+        clearTimeout(justSortedTimerRef.current);
+        clearTimeout(editTimerRef.current);
+        clearTimeout(editSavedTimerRef.current);
+      }, []);
 
       /** Crash-guard: persist the draft (used only when closing with unsaved
        *  content, so a mid-edit refresh never loses it). */
@@ -431,6 +459,7 @@ window.__ModuleLoader__.load({
             if (value !== null && typeof value === "object" && value.ok === true) {
               setHistory((current) => current.filter((entry) => entry !== null && typeof entry === "object" && entry.id !== id));
               setExpandedId((current) => current === id ? null : current);
+              if (editIdRef.current === id) endEdit();
             } else {
               setHistError(value !== null && typeof value === "object" && typeof value.message === "string" ? value.message : "删除失败");
             }
@@ -469,6 +498,118 @@ window.__ModuleLoader__.load({
         }
         setHistError("复制失败");
       }, []);
+
+      //#region history inline edit (double-click to edit, debounced autosave)
+      /**
+       * Persist the pending edit of the currently edited history entry.
+       * Guarded by a per-save sequence number: responses from superseded
+       * requests are dropped, and keystrokes that landed while a request was
+       * in flight are re-scheduled once the response returns, so nothing is
+       * ever stranded.
+       */
+      const saveEdit = React.useCallback(() => {
+        clearTimeout(editTimerRef.current);
+        const id = editIdRef.current;
+        if (id === null || editSavingRef.current) return;
+        editSavingRef.current = true;
+        editDirtyRef.current = false;
+        const seq = editSeqRef.current + 1;
+        editSeqRef.current = seq;
+        setEditStatus("saving");
+        setEditError(null);
+        fetch(API_PATH, {
+          method: "POST",
+          headers: { accept: "application/json", "content-type": "application/json" },
+          body: JSON.stringify({ method: "updateHistory", id, text: editTextRef.current }),
+          cache: "no-store",
+        })
+          .then((response) => response.json())
+          .then((value) => {
+            editSavingRef.current = false;
+            if (!alive.current || seq !== editSeqRef.current) return;
+            if (value !== null && typeof value === "object" && value.ok === true) {
+              if (value.value !== null && typeof value.value === "object" && Array.isArray(value.value.history)) {
+                setHistory(value.value.history);
+              }
+              setEditStatus("saved");
+              clearTimeout(editSavedTimerRef.current);
+              editSavedTimerRef.current = setTimeout(() => {
+                if (alive.current && seq === editSeqRef.current) setEditStatus(null);
+              }, 1800);
+            } else {
+              setEditStatus("error");
+              setEditError(value !== null && typeof value === "object" && typeof value.message === "string" ? value.message : "保存失败");
+            }
+            if (editDirtyRef.current) {
+              editDirtyRef.current = false;
+              clearTimeout(editTimerRef.current);
+              editTimerRef.current = setTimeout(saveEdit, 250);
+            }
+          })
+          .catch(() => {
+            editSavingRef.current = false;
+            if (!alive.current || seq !== editSeqRef.current) return;
+            setEditStatus("error");
+            setEditError("网络错误，保存失败");
+          });
+      }, []);
+
+      /** Debounced save after each keystroke (600 ms quiet period). */
+      const scheduleEditSave = React.useCallback(() => {
+        clearTimeout(editTimerRef.current);
+        editTimerRef.current = setTimeout(saveEdit, 600);
+      }, [saveEdit]);
+
+      /** Leave edit mode, persisting any pending changes first. */
+      const endEdit = React.useCallback(() => {
+        clearTimeout(editTimerRef.current);
+        clearTimeout(editSavedTimerRef.current);
+        editIdRef.current = null;
+        setEditId(null);
+        setEditStatus(null);
+        setEditError(null);
+      }, []);
+
+      /** Flush a pending edit (blur, collapse, window close). */
+      const flushEdit = React.useCallback(() => {
+        if (editIdRef.current === null || editSavingRef.current) return;
+        clearTimeout(editTimerRef.current);
+        saveEdit();
+      }, [saveEdit]);
+
+      /** Enter edit mode for one history entry (double-click on its body). */
+      const startEdit = React.useCallback((entry) => {
+        if (editIdRef.current === entry.id) return;
+        flushEdit();
+        editIdRef.current = entry.id;
+        setEditId(entry.id);
+        editTextRef.current = entry.text;
+        setEditText(entry.text);
+        setEditStatus(null);
+        setEditError(null);
+      }, [flushEdit]);
+
+      const onEditChange = React.useCallback((event) => {
+        const value = event.target.value;
+        editTextRef.current = value;
+        editDirtyRef.current = true;
+        setEditText(value);
+        setEditStatus("dirty");
+        setEditError(null);
+        scheduleEditSave();
+      }, [scheduleEditSave]);
+
+      const onEditBlur = React.useCallback(() => {
+        flushEdit();
+      }, [flushEdit]);
+
+      const onEditKeyDown = React.useCallback((event) => {
+        if (event.key !== "Escape") return;
+        event.stopPropagation();
+        flushEdit();
+        endEdit();
+      }, [flushEdit, endEdit]);
+      //#endregion
 
       //#region history window drag & resize
       /** Begin moving the history window from its title bar. */
@@ -545,13 +686,14 @@ window.__ModuleLoader__.load({
       //#endregion
 
       /** Close the popover (and any open history window); unsaved content
-       *  becomes a recoverable draft. */
+       *  becomes a recoverable draft, a pending history edit is flushed. */
       const close = React.useCallback(() => {
         setOpen(false);
         setHistOpen(false);
         setExpandedId(null);
+        flushEdit();
         if (dirtyRef.current) save();
-      }, [save]);
+      }, [save, flushEdit]);
 
       const toggle = React.useCallback(() => {
         if (open) {
@@ -619,6 +761,12 @@ window.__ModuleLoader__.load({
         : status === "saved" ? "已保存"
         : status === "error" ? (error ?? "出错了")
         : status === "dirty" ? "未保存"
+        : "";
+
+      const editStatusText = editStatus === "dirty" ? "编辑中…"
+        : editStatus === "saving" ? "保存中…"
+        : editStatus === "saved" ? "已自动保存"
+        : editStatus === "error" ? (editError ?? "保存失败")
         : "";
 
       const preview = text.replace(/\s+/g, " ").slice(0, 60);
@@ -701,6 +849,7 @@ window.__ModuleLoader__.load({
       const histItems = orderedRows.map((entry) => {
         const isOpen = expandedId === entry.id;
         const copied = copiedId === entry.id;
+        const editing = editId === entry.id;
         const row = React.createElement(
           "div",
           {
@@ -710,9 +859,15 @@ window.__ModuleLoader__.load({
             "data-dragging": dragId === entry.id || undefined,
             "data-drag-over": dragOverId === entry.id || undefined,
             "data-drag-side": dragOverId === entry.id && dragSide !== null ? dragSide : undefined,
-            draggable: true,
-            title: isOpen ? "收起" : "点击查看 · 拖动排序",
-            onClick: () => setExpandedId(isOpen ? null : entry.id),
+            draggable: !editing,
+            title: isOpen ? "收起 · 双击内容可编辑" : "点击查看 · 拖动排序",
+            onClick: () => {
+              if (isOpen && editIdRef.current === entry.id) {
+                flushEdit();
+                endEdit();
+              }
+              setExpandedId(isOpen ? null : entry.id);
+            },
             onDragStart: (event) => onDragStart(event, entry.id),
             onDragEnd,
             onDragOver: (event) => onDragOver(event, entry.id),
@@ -720,14 +875,14 @@ window.__ModuleLoader__.load({
             onDrop: (event) => onDrop(event, entry.id),
           },
           React.createElement("span", { className: "dan-note-hist-time", title: entry.updatedAt }, formatTime(entry.updatedAt)),
-          React.createElement("span", { className: "dan-note-hist-preview", title: entry.text }, entry.text),
+          React.createElement("span", { className: "dan-note-hist-preview", title: editing ? editText : entry.text }, editing ? editText : entry.text),
           React.createElement("button", {
             type: "button",
             className: "dan-note-hist-copy",
             "data-copied": copied || undefined,
             "aria-label": copied ? "已复制" : "复制内容",
             title: copied ? "已复制" : "复制内容",
-            onClick: (event) => { event.stopPropagation(); copyEntry(entry.id, entry.text); },
+            onClick: (event) => { event.stopPropagation(); copyEntry(entry.id, editing ? editText : entry.text); },
           }, copied ? CHECK_ICON : COPY_ICON),
           React.createElement("button", {
             type: "button",
@@ -739,7 +894,32 @@ window.__ModuleLoader__.load({
           }, TRASH_ICON)
         );
         return isOpen
-          ? React.createElement(React.Fragment, { key: entry.id }, row, React.createElement("div", { className: "dan-note-hist-body" }, entry.text))
+          ? React.createElement(React.Fragment, { key: entry.id }, row, React.createElement("div", {
+              className: editing ? "dan-note-hist-body dan-note-hist-body-edit" : "dan-note-hist-body",
+              title: editing ? undefined : "双击编辑内容",
+              onDoubleClick: () => startEdit(entry),
+            }, editing
+              ? [
+                  React.createElement("textarea", {
+                    key: "edit",
+                    className: "dan-note-hist-edit",
+                    value: editText,
+                    onChange: onEditChange,
+                    onBlur: onEditBlur,
+                    onKeyDown: onEditKeyDown,
+                    maxLength: 16000,
+                    spellCheck: false,
+                    autoFocus: true,
+                    "aria-label": "编辑历史便签内容",
+                  }),
+                  editStatus !== null
+                    ? React.createElement("span", {
+                        key: "status",
+                        className: editStatus === "error" ? "dan-note-hist-edit-status dan-note-err" : "dan-note-hist-edit-status",
+                      }, editStatusText)
+                    : null,
+                ]
+              : entry.text))
           : row;
       });
 

@@ -15,7 +15,7 @@
  * saving is explicit, never automatic. The draft slot (`text`) exists only
  * as a crash guard: it is written when the popover closes with unsaved
  * content (`setNote`) and recovered on the next open. History entries can
- * be viewed and deleted individually.
+ * be viewed, edited in place (`updateHistory`), and deleted individually.
  *
  * Contract with the browser half:
  *   `POST { method: 'getNote' }`       → `{ ok, value: { text, updatedAt, history } }`
@@ -23,6 +23,10 @@
  *   `POST { method: 'setNote', text }` → crash-guard draft write only.
  *   `POST { method: 'commitNote', text }` → explicit save: archives into
  *                                       history, clears the draft.
+ *   `POST { method: 'updateHistory', id, text }` → in-place edit of one
+ *                                       history entry (id kept, position
+ *                                       kept, `updatedAt` refreshed), returns
+ *                                       `{ updated, history }`.
  *   `POST { method: 'deleteHistory', id }` → removes one history entry
  *                                       (idempotent), returns `{ id, deleted }`.
  * Business errors travel as HTTP 200 + `{ ok: false, error, message }`; only
@@ -226,6 +230,58 @@ export function commitNote(text) {
 }
 
 /**
+ * Update one history entry in place (serialized + atomic). Used by the
+ * double-click-to-edit autosave path: the entry keeps its id and its
+ * position in the list (manual drag order is never reshuffled by edits);
+ * only `text` and `updatedAt` change. Idempotent-friendly: an unknown id
+ * returns `{ updated: false }` instead of failing, so a race with a
+ * concurrent deletion cannot wedge the editor.
+ * @param id - the history entry id to update.
+ * @param text - the new entry body.
+ * @returns `{ ok: true, value: { updated, history } }` or a business error.
+ */
+export function updateHistory(id, text) {
+  if (typeof id !== 'string' || id.length === 0) {
+    return Promise.resolve({ ok: false, error: 'bad-id', message: '缺少历史条目 id' });
+  }
+  if (typeof text !== 'string') {
+    return Promise.resolve({ ok: false, error: 'bad-text', message: '便签内容必须是文本' });
+  }
+  if (text.length > MAX_TEXT_CHARS) {
+    return Promise.resolve({
+      ok: false,
+      error: 'too-long',
+      message: `便签内容超过 ${MAX_TEXT_CHARS} 字符上限`,
+    });
+  }
+  const run = writeChain.then(async () => {
+    const current = await loadNote();
+    if (!current.ok) throw new Error(current.message ?? 'read failed');
+    const before = Array.isArray(current.value.history) ? current.value.history : [];
+    let updated = false;
+    const history = before.map((entry) => {
+      if (!updated && entry !== null && typeof entry === 'object' && entry.id === id) {
+        updated = true;
+        return { ...entry, text, updatedAt: new Date().toISOString() };
+      }
+      return entry;
+    });
+    const value = { text: current.value.text, updatedAt: current.value.updatedAt, history };
+    await publishNote(value);
+    return { updated, history: value.history };
+  });
+  writeChain = run.catch(() => {});
+  return run.then(
+    (value) => ({ ok: true, value }),
+    (error) => ({
+      ok: false,
+      error: 'write-failed',
+      message: `便签更新失败：${error instanceof Error ? error.message : String(error)}`,
+    }),
+  );
+}
+
+/**
  * Delete one history entry by id (serialized + atomic, idempotent).
  * @param id - the history entry id to remove.
  * @returns `{ ok: true, value: { id, deleted } }` or a business error.
@@ -320,6 +376,8 @@ async function handleApi(ctx, body) {
       return saveNote(body?.text);
     case 'commitNote':
       return commitNote(body?.text);
+    case 'updateHistory':
+      return updateHistory(body?.id, body?.text);
     case 'deleteHistory':
       return deleteHistory(body?.id);
     case 'ping':
