@@ -21,7 +21,8 @@
       "patch": "./cordis.patch.yml"
     }
   },
-  "license": "MIT",
+    "author": "Vast-Unhurried",
+"license": "MIT",
   "peerDependencies": {
     "@deepseek-ai/dsh-host-webserver": "*",
     "@deepseek-ai/dsh-host-apiproxy": "*",

@@ -31,7 +31,8 @@
       "platform": "web"
     }
   },
-  "license": "MIT",
+    "author": "Vast-Unhurried",
+"license": "MIT",
   "peerDependencies": {
     "@deepseek-ai/dsh-host-webserver": "*",
     "@deepseek-ai/dsh-credentials": "*"
