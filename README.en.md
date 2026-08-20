@@ -2,9 +2,9 @@
 
 [简体中文](README.md) | English
 
-A collection of **purely incremental** native plugins for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): **sticky notes**, **API balance & per-turn cost**, **reasoning levels**, and **session deletion**.
+A collection of **purely incremental** native plugins for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): **sticky notes**, **API balance & per-turn cost**, **reasoning levels**, **session deletion**, and **conversation node navigation**.
 
-All four plugins follow the same principle: **no modification of Harness core** — everything is injected through official slots and dedicated API routes, and uninstalling fully restores the original state.
+All five plugins follow the same principle: **no modification of Harness core** — everything is injected through official slots and dedicated API routes (`dsh-session-nav` is a pure client plugin that only reads official DOM contracts and has no host route), and uninstalling fully restores the original state.
 
 ## Plugin overview
 
@@ -14,6 +14,7 @@ All four plugins follow the same principle: **no modification of Harness core** 
 | :moneybag: **dsh-api-balance** | API balance + per-turn cost + today's usage (¥ / tokens, peak-off-peak pricing, per-vendor stats) | Session header actions + each assistant reply |
 | :brain: **dsh-reasoning-levels** | Five-tier reasoning effort (low / medium / high / xhigh / max) for third-party models | Official model selector |
 | :wastebasket: **dsh-session-delete** | "Delete session" action that cleans up session data thoroughly | Session list ⋮ menu |
+| :dna: **dsh-session-nav** | Conversation node navigation: one bar per user turn — hover preview / click to jump & pin to top / double-click to pin | Right edge between text column and scrollbar (always resident) |
 
 ### :memo: dsh-note — Native sticky notes
 
@@ -46,6 +47,14 @@ All four plugins follow the same principle: **no modification of Harness core** 
 - Strict session-ID validation; on-disk paths use the exact same encoding as the core backend, deletion targets are verified inside the storage root (including symlink protection); a missing storage root refuses deletion instead of silently succeeding
 - Duplicate titles refuse to guess (no wrong-session deletion); a confirm dialog shows the session ID
 
+### :dna: dsh-session-nav — Conversation node navigation
+
+- An always-resident bar at the **right edge, between the text column and the scrollbar**: **one pill per user turn** (9×3 fully-rounded capsule, white in dark mode / black in light mode, theme-aware), **max 6 visible at once** — wheel over the bar scrolls the rest like a bicycle chain
+- **Hover**: pill smoothly lengthens + preview card with the round's **full content** (internally scrollable); **single click**: smooth jump to that round + the **top box** shows its full content; **double click**: **pin / unpin** (highlight only, no dot, **unlimited pins**, persisted in localStorage); the active pill (DeepSeek blue) follows your reading position and auto-scrolls into view
+- **Follows the current session**: switching sessions shows that session's turn count immediately; uncompressed content shows right away, compacted history **preloads slowly in the background** (one page per 2.8 s, only when idle, never queued); clicking an unloaded round page-loads it on demand
+- **Top box**: frosted transparent glass (`blur(24px)` + 40% theme background), width = text column **+ 2.5 cm on each side**, height grows with content (up to 70vh), keeps its frost while scrolling
+- Pure client plugin: only reads official DOM contracts (`data-chat-flow` / `data-conversation-scroll` etc.) + the `sessions` service — **no host API route, no core state touched**, uninstall fully restores
+
 ## Repository layout
 
 ```
@@ -54,12 +63,13 @@ dsh-toolkit/
 │   ├── dsh-note/                # sticky notes
 │   ├── dsh-api-balance/         # balance & cost
 │   ├── dsh-reasoning-levels/    # third-party reasoning levels
-│   └── dsh-session-delete/      # session deletion
+│   ├── dsh-session-delete/      # session deletion
+│   └── dsh-session-nav/         # conversation node navigation
 ├── pnpm-workspace.yaml          # pnpm monorepo
 └── README.md
 ```
 
-The four packages are independent: install / update / remove each one separately.
+The five packages are independent: install / update / remove each one separately.
 
 ## Install
 
@@ -75,6 +85,7 @@ dsh plugin --profile web add file:./packages/dsh-note
 dsh plugin --profile web add file:./packages/dsh-api-balance
 dsh plugin --profile web add file:./packages/dsh-reasoning-levels
 dsh plugin --profile web add file:./packages/dsh-session-delete
+dsh plugin --profile web add file:./packages/dsh-session-nav
 ```
 
 > Adjust `--profile web` to your actual profile; `file:` supports relative paths — run from the repo root.
@@ -88,13 +99,24 @@ dsh plugin --profile web remove dsh-note
 dsh plugin --profile web remove dsh-api-balance
 dsh plugin --profile web remove dsh-reasoning-levels
 dsh plugin --profile web remove dsh-session-delete
+dsh plugin --profile web remove dsh-session-nav
 ```
 
 Uninstalling fully restores the original state. Note data (`$DSH_HOME/storages/dsh-note.json`) is kept by default — delete the file manually if you want it gone; after removing `dsh-reasoning-levels`, you may clean the `reasoningEfforts` / `reasoning` / `compat.supportsReasoningEffort` fields the plugin wrote under `llm-pi-ai` in `settings.yaml`.
 
+## Troubleshooting
+
+> **Q: Installation says "This is not an installable plugin package / package.json does not declare dsh.bundle". What now?**
+>
+> You pointed the installer at the **repository root** (or the repo's GitHub URL / zip archive). `dsh-toolkit` is a monorepo shell — its root `package.json` **deliberately omits** `dsh.bundle` because it is not a plugin itself.
+>
+> Point at a **specific plugin directory** instead:
+> - CLI: `dsh plugin --profile web add file:./packages/dsh-session-nav` (any plugin name works; `file:` accepts relative/absolute paths)
+> - Web install dialog: select the `packages/<plugin-name>` folder, not the repository root
+
 ## Compatibility & security
 
-- Client only consumes official slots: `conversation.input.left`, `conversation.session.header.actions`, `conversation.chat.assistant-actions`, etc.
+- Client only consumes official slots: `conversation.input.left`, `conversation.session.header.actions`, `conversation.chat.assistant-actions`, etc. (`dsh-session-nav` is pure client: it only reads DOM contracts and the `sessions` service, mounts no slot)
 - Host only adds dedicated API routes (`/plugins/dsh-note/api`, `/plugins/api-balance/api`, `/plugins/reasoning-levels/api`, `/plugins/session-delete/api`); no core state is modified or subscribed.
 - All API routes enforce same-origin checks (loopback Host + exact Origin/Host match), rejecting cross-site and DNS-rebinding requests.
 - No telemetry; no sensitive data beyond credentials is read; nothing is sent to third parties.

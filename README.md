@@ -2,9 +2,9 @@
 
 [English](README.en.md) | 简体中文
 
-一组**纯增量**的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 原生插件合集：**便签**、**API 余额与费用**、**推理等级**、**删除会话**。
+一组**纯增量**的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 原生插件合集：**便签**、**API 余额与费用**、**推理等级**、**删除会话**、**对话节点导航条**。
 
-四个插件遵循同一原则：**不改动 Harness 核心**——全部通过官方插槽（slot）与独立 API 路由注入，卸载即完全还原。
+五个插件遵循同一原则：**不改动 Harness 核心**——全部通过官方插槽（slot）与独立 API 路由注入（`dsh-session-nav` 为纯客户端插件，只读官方 DOM 契约，无宿主路由），卸载即完全还原。
 
 ## 插件一览
 
@@ -14,6 +14,7 @@
 | :moneybag: **dsh-api-balance** | API 余额 + 本轮费用 + 今日消耗（¥ / token，峰谷计价，官方路由合并统计） | 会话头部操作行 + 每条回复操作行 |
 | :brain: **dsh-reasoning-levels** | 第三方模型五档推理等级（low / medium / high / xhigh / max） | 官方模型选择器 |
 | :wastebasket: **dsh-session-delete** | 「删除会话」，彻底清理会话数据 | 会话列表 ⋮ 菜单 |
+| :dna: **dsh-session-nav** | 对话节点导航条：每条提问一轮次一短横条，悬停预览 / 单击跳转并置顶 / 双击钉住 | 文字列与滚动条之间（右缘常驻） |
 
 ## 界面预览
 
@@ -55,6 +56,14 @@
 - 拒绝删除**运行中**的会话（先停止/关闭再重试）；会话 ID 严格校验，目录路径与核心编码逐字符一致，删除范围精确限定在存储根内（含符号链接防护）
 - 删除前弹窗确认并展示会话 ID；重名会话拒绝猜测，避免误删
 
+### :dna: dsh-session-nav — 对话节点导航条
+
+- 会话窗口内、**文字列与滚动条之间**的右缘节点串：**每条 user 提问一轮次一短横条**（9×3 全圆角胶囊，深色模式白色、浅色模式黑色，随主题），**最多同时显示 6 条**，超出部分在节点串上**滚轮链条式翻看**
+- **悬停**：短横条平滑加长 + 弹出预览卡（该轮**全部内容**，超高内部滚动）；**单击**：平滑跳转到该轮 + **置顶框**显示该轮全部内容；**双击**：**钉住/取消钉住**（仅高亮、无蓝点，**个数不限**，localStorage 持久化）；激活条（DeepSeek 蓝）跟随阅读位置并自动滚入可视区
+- **常驻跟随会话**：切换会话自动显示该会话轮次数；未压缩内容立即显示，压缩历史**后台缓慢预载**（每 2.8s 一页，空闲才点、绝不堆积），点击未加载轮次时按需快速补页
+- **置顶框**：磨砂透明玻璃（`blur(24px)` + 主题底色 40%），宽度 = 文字列宽 + **左右各加长 2.5cm**，高度随内容伸展（上限 70vh），滚动时保持磨砂
+- 纯客户端插件：只读官方 DOM 契约（`data-chat-flow` / `data-conversation-scroll` 等）+ `sessions` 服务，**无宿主 API 路由、不修改任何核心状态**，卸载完全还原
+
 ## 仓库结构
 
 ```
@@ -63,12 +72,13 @@ dsh-toolkit/
 │   ├── dsh-note/                # 便签插件
 │   ├── dsh-api-balance/         # 余额与费用插件
 │   ├── dsh-reasoning-levels/    # 第三方模型推理等级插件
-│   └── dsh-session-delete/      # 删除会话插件
+│   ├── dsh-session-delete/      # 删除会话插件
+│   └── dsh-session-nav/         # 对话节点导航条插件
 ├── pnpm-workspace.yaml          # pnpm monorepo 聚合
 └── README.md
 ```
 
-四个包相互独立：可**单独安装、单独更新、单独卸载**，互不依赖。
+五个包相互独立：可**单独安装、单独更新、单独卸载**，互不依赖。
 
 ## 安装
 
@@ -84,6 +94,7 @@ dsh plugin --profile web add file:./packages/dsh-note
 dsh plugin --profile web add file:./packages/dsh-api-balance
 dsh plugin --profile web add file:./packages/dsh-reasoning-levels
 dsh plugin --profile web add file:./packages/dsh-session-delete
+dsh plugin --profile web add file:./packages/dsh-session-nav
 ```
 
 > `--profile web` 按你的实际 profile 名调整；`file:` 支持相对路径，从仓库根目录执行即可。
@@ -97,13 +108,24 @@ dsh plugin --profile web remove dsh-note
 dsh plugin --profile web remove dsh-api-balance
 dsh plugin --profile web remove dsh-reasoning-levels
 dsh plugin --profile web remove dsh-session-delete
+dsh plugin --profile web remove dsh-session-nav
 ```
 
 卸载即完全还原。便签数据文件（`$DSH_HOME/storages/dsh-note.json`）默认保留，如需彻底清除手动删除该文件；`dsh-reasoning-levels` 卸载后可按需清理 `settings.yaml` 中 `llm-pi-ai` 下插件写入的 `reasoningEfforts` / `reasoning` / `compat.supportsReasoningEffort` 字段。
 
+## 常见问题
+
+> **问：安装时提示"这不是可安装的插件包 / package.json 里没有声明 dsh.bundle"，怎么办？**
+>
+> 这是因为给安装器的是**仓库根目录**（或仓库的 GitHub 地址 / zip 压缩包）。`dsh-toolkit` 是 monorepo 聚合壳，根 `package.json` **故意不声明** `dsh.bundle`——它本身不是插件。
+>
+> 正确做法是**指向具体插件目录**：
+> - 命令行：`dsh plugin --profile web add file:./packages/dsh-session-nav`（任意插件名皆可，`file:` 支持相对/绝对路径）
+> - Web 安装对话框：请选择 `packages/<插件名>` 目录，而不是仓库根目录
+
 ## 兼容性与安全边界
 
-- 客户端只读官方插槽：`conversation.input.left`、`conversation.session.header.actions`、`conversation.chat.assistant-actions` 等
+- 客户端只读官方插槽：`conversation.input.left`、`conversation.session.header.actions`、`conversation.chat.assistant-actions` 等（`dsh-session-nav` 为纯客户端，只读 DOM 契约与 `sessions` 服务，不挂任何插槽）
 - 宿主侧仅新增独立 API 路由（`/plugins/dsh-note/api`、`/plugins/api-balance/api`、`/plugins/reasoning-levels/api`、`/plugins/session-delete/api`），不修改、不订阅任何核心状态
 - 所有 API 路由做同源校验（要求 Host 为回环地址且 Origin 与 Host 精确一致），拒绝跨站与 DNS rebinding 请求
 - 不收集任何遥测；不读取凭据以外的敏感信息；不向第三方发送数据

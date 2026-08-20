@@ -1,0 +1,4 @@
+# dsh-session-nav bundle：向组合挂 Node half（空 apply，行为全在 client）
+- insert:
+    - id: dsh-session-nav
+      name: dsh-session-nav
