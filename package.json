@@ -2,7 +2,27 @@
   "name": "dsh-toolkit",
   "version": "1.0.0",
   "private": true,
-  "description": "DeepSeek Harness 实用工具箱：便签、API 余额与费用、删除会话（monorepo）",
+  "description": "DeepSeek Harness 实用工具箱：便签、API 余额与费用、推理等级、删除会话、对话节点导航条（monorepo）",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "toolkit",
+    "monorepo",
+    "plugin"
+  ],
   "license": "MIT",
+  "author": "Vast-Unhurried",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vast-Unhurried/dsh-toolkit.git"
+  },
+  "homepage": "https://github.com/Vast-Unhurried/dsh-toolkit#readme",
+  "bugs": {
+    "url": "https://github.com/Vast-Unhurried/dsh-toolkit/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {}
 }
