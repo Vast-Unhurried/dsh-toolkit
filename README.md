@@ -76,7 +76,19 @@ dsh-toolkit/
 
 ## 安装
 
-要求：DeepSeek Harness v0.1.0-rc.7+（Web 界面，Windows 实测）。
+要求：DeepSeek Harness v0.1.0-rc.7+（Web 界面，Windows 实测）；pnpm ≥ 9（支持 git 子目录语法）。
+
+**方式一：直接从 GitHub 安装（无需 clone，推荐给其他人）**
+
+```bash
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-session-nav"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-note"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-api-balance"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-reasoning-levels"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-session-delete"
+```
+
+**方式二：clone 后本地安装**
 
 ```bash
 # 1. 克隆仓库

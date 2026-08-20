@@ -73,7 +73,19 @@ The five packages are independent: install / update / remove each one separately
 
 ## Install
 
-Requires DeepSeek Harness v0.1.0-rc.7+ (Web UI; tested on Windows).
+Requires DeepSeek Harness v0.1.0-rc.7+ (Web UI; tested on Windows) and pnpm ≥ 9 (git subfolder syntax).
+
+**Option A — install straight from GitHub (no clone needed; recommended for everyone else)**
+
+```bash
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-session-nav"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-note"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-api-balance"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-reasoning-levels"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-session-delete"
+```
+
+**Option B — clone, then install from local paths**
 
 ```bash
 # 1. Clone the repo
