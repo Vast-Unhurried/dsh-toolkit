@@ -1,9 +1,9 @@
 {
   "name": "dsh-session-nav",
   "version": "1.0.0",
-  "type": "module",
   "description": "对话节点导航条：会话窗口内、文字列与滚动条之间的右缘节点串——每条 user 提问一轮次一节点，悬停预览、单击跳转并置顶、双击钉住、激活药丸跟随阅读位置",
   "main": "lib/index.js",
+  "type": "module",
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
@@ -25,5 +25,7 @@
       ],
       "platform": "web"
     }
-  }
+  },
+  "author": "Vast-Unhurried",
+  "license": "MIT"
 }
