@@ -104,16 +104,6 @@ dsh plugin --profile web remove dsh-session-nav
 
 Uninstalling fully restores the original state. Note data (`$DSH_HOME/storages/dsh-note.json`) is kept by default — delete the file manually if you want it gone; after removing `dsh-reasoning-levels`, you may clean the `reasoningEfforts` / `reasoning` / `compat.supportsReasoningEffort` fields the plugin wrote under `llm-pi-ai` in `settings.yaml`.
 
-## Troubleshooting
-
-> **Q: Installation says "This is not an installable plugin package / package.json does not declare dsh.bundle". What now?**
->
-> You pointed the installer at the **repository root** (or the repo's GitHub URL / zip archive). `dsh-toolkit` is a monorepo shell — its root `package.json` **deliberately omits** `dsh.bundle` because it is not a plugin itself.
->
-> Point at a **specific plugin directory** instead:
-> - CLI: `dsh plugin --profile web add file:./packages/dsh-session-nav` (any plugin name works; `file:` accepts relative/absolute paths)
-> - Web install dialog: select the `packages/<plugin-name>` folder, not the repository root
-
 ## Compatibility & security
 
 - Client only consumes official slots: `conversation.input.left`, `conversation.session.header.actions`, `conversation.chat.assistant-actions`, etc. (`dsh-session-nav` is pure client: it only reads DOM contracts and the `sessions` service, mounts no slot)

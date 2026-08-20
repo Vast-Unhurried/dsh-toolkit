@@ -18,13 +18,7 @@
 
 ## 界面预览
 
-![便签与余额](docs/screenshots/screenshot-note-and-balance.png)
-
-*输入框工具行的便签按钮与浮层（新建 / 历史 / 保存）、会话头部余额徽章与每条回复的本轮费用。*
-
-![删除会话菜单](docs/screenshots/screenshot-session-delete.jpg)
-
-*会话列表 ⋮ 菜单中的「删除会话」。*
+![插件界面预览](docs/screenshots/screenshot-toolkit.jpg)
 
 ### :memo: dsh-note — 原生便签
 
@@ -112,16 +106,6 @@ dsh plugin --profile web remove dsh-session-nav
 ```
 
 卸载即完全还原。便签数据文件（`$DSH_HOME/storages/dsh-note.json`）默认保留，如需彻底清除手动删除该文件；`dsh-reasoning-levels` 卸载后可按需清理 `settings.yaml` 中 `llm-pi-ai` 下插件写入的 `reasoningEfforts` / `reasoning` / `compat.supportsReasoningEffort` 字段。
-
-## 常见问题
-
-> **问：安装时提示"这不是可安装的插件包 / package.json 里没有声明 dsh.bundle"，怎么办？**
->
-> 这是因为给安装器的是**仓库根目录**（或仓库的 GitHub 地址 / zip 压缩包）。`dsh-toolkit` 是 monorepo 聚合壳，根 `package.json` **故意不声明** `dsh.bundle`——它本身不是插件。
->
-> 正确做法是**指向具体插件目录**：
-> - 命令行：`dsh plugin --profile web add file:./packages/dsh-session-nav`（任意插件名皆可，`file:` 支持相对/绝对路径）
-> - Web 安装对话框：请选择 `packages/<插件名>` 目录，而不是仓库根目录
 
 ## 兼容性与安全边界
 
