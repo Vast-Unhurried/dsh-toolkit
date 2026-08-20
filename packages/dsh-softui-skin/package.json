@@ -1,0 +1,51 @@
+{
+  "name": "dsh-softui-skin",
+  "version": "0.2.0",
+  "description": "Neumorphism soft-UI skin for DeepSeek Harness web — gentle raised-and-recessed surfaces in a cream light and an ink-dark palette, switched by one native toggle in 设置 → 通用设置 → 外观. The light/dark variant always mirrors the harness's native appearance; the choice survives refresh and restart. · DeepSeek Harness 轻拟物皮肤:设置-通用设置-外观中的系统原生开关,浅色/深色跟随系统原生外观,刷新、关闭后不会还原。修改自 Lhy723/dsh-neu-theme (MIT)。",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "themes",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "dsh-plugin",
+    "theme",
+    "skin",
+    "neumorphism",
+    "soft-ui",
+    "web-ui"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-theme"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "author": "Vast-Unhurried",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node --check lib/client.js && node --check lib/index.js"
+  }
+}

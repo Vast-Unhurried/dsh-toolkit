@@ -2,9 +2,9 @@
 
 [简体中文](README.md) | English
 
-A collection of **purely incremental** native plugins for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): **sticky notes**, **API balance & per-turn cost**, **reasoning levels**, **session deletion**, and **conversation node navigation**.
+A collection of **purely incremental** native plugins for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): **sticky notes**, **API balance & per-turn cost**, **reasoning levels**, **session deletion**, **conversation node navigation**, and a **soft-UI skin**.
 
-All five plugins follow the same principle: **no modification of Harness core** — everything is injected through official slots and dedicated API routes (`dsh-session-nav` is a pure client plugin that only reads official DOM contracts and has no host route), and uninstalling fully restores the original state.
+All six plugins follow the same principle: **no modification of Harness core** — everything is injected through official slots and dedicated API routes (`dsh-session-nav` is a pure client plugin that only reads official DOM contracts and has no host route), and uninstalling fully restores the original state.
 
 ## Plugin overview
 
@@ -15,6 +15,7 @@ All five plugins follow the same principle: **no modification of Harness core** 
 | :brain: **dsh-reasoning-levels** | Five-tier reasoning effort (low / medium / high / xhigh / max) for third-party models | Official model selector |
 | :wastebasket: **dsh-session-delete** | "Delete session" action that cleans up session data thoroughly | Session list ⋮ menu |
 | :dna: **dsh-session-nav** | Conversation node navigation: one bar per user turn — hover preview / click to jump & pin to top / double-click to pin | Right edge between text column and scrollbar (always resident) |
+| :art: **dsh-softui-skin** | Neumorphism soft-UI skin: one native toggle; light/dark follows the native appearance; state persists across refresh/restart ([derived from Lhy723/dsh-neu-theme](https://github.com/Lhy723/dsh-neu-theme)) | Settings → General → Appearance |
 
 ### :memo: dsh-note — Native sticky notes
 
@@ -55,6 +56,16 @@ All five plugins follow the same principle: **no modification of Harness core** 
 - **Top box**: frosted transparent glass (`blur(24px)` + 40% theme background), width = text column **+ 2.5 cm on each side**, height grows with content (up to 70vh), keeps its frost while scrolling
 - Pure client plugin: only reads official DOM contracts (`data-chat-flow` / `data-conversation-scroll` etc.) + the `sessions` service — **no host API route, no core state touched**, uninstall fully restores
 
+### :art: dsh-softui-skin — Neumorphism soft-UI skin
+
+> **Derived from [Lhy723/dsh-neu-theme](https://github.com/Lhy723/dsh-neu-theme) (MIT)**: the skin styles and palettes follow the original project; this plugin turns its three-way selector into a **system-native toggle** and adds robustness fixes.
+
+- A **system-native toggle** in **Settings → General → Appearance** (right below the built-in Appearance row), styled with the harness's own design tokens (`role="switch"`, theme-aware in both schemes)
+- **ON**: applies the skin — **light (cream) / dark (ink-blue) follows the native appearance** — native dark gives the dark skin; when the native preference is "system", the skin follows OS light/dark switches automatically
+- **OFF**: the page is exactly as the harness ships it — no injected styles, no body marker, no leftover token overrides
+- **Persists**: the toggle lives in localStorage (`dsh-softui:enabled`, legacy key auto-migrated and cleaned up); refresh / close / restart never revert to the native look while the toggle is on
+- **No core changes**: colors stack as a token override layer via the built-in ThemeRuntime `overrideTokens()` (never writes the `ui-theme` preference or `settings.yaml`); shadow/frost/grain styles are plugin-owned `<style>` scoped under `body[data-dsh-softui]`; cross-tab `storage` sync; all 103 theme tokens validated at build time
+
 ## Repository layout
 
 ```
@@ -64,12 +75,13 @@ dsh-toolkit/
 │   ├── dsh-api-balance/         # balance & cost
 │   ├── dsh-reasoning-levels/    # third-party reasoning levels
 │   ├── dsh-session-delete/      # session deletion
-│   └── dsh-session-nav/         # conversation node navigation
+│   ├── dsh-session-nav/         # conversation node navigation
+│   └── dsh-softui-skin/         # soft-UI skin
 ├── pnpm-workspace.yaml          # pnpm monorepo
 └── README.md
 ```
 
-The five packages are independent: install / update / remove each one separately.
+The six packages are independent: install / update / remove each one separately.
 
 ## Install
 
@@ -83,6 +95,7 @@ dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/ds
 dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-api-balance"
 dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-reasoning-levels"
 dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-session-delete"
+dsh plugin --profile web add "github:Vast-Unhurried/dsh-toolkit#path:packages/dsh-softui-skin"
 ```
 
 **Option B — clone, then install from local paths**
@@ -98,6 +111,7 @@ dsh plugin --profile web add file:./packages/dsh-api-balance
 dsh plugin --profile web add file:./packages/dsh-reasoning-levels
 dsh plugin --profile web add file:./packages/dsh-session-delete
 dsh plugin --profile web add file:./packages/dsh-session-nav
+dsh plugin --profile web add file:./packages/dsh-softui-skin
 ```
 
 > Adjust `--profile web` to your actual profile; `file:` supports relative paths — run from the repo root.
@@ -112,13 +126,14 @@ dsh plugin --profile web remove dsh-api-balance
 dsh plugin --profile web remove dsh-reasoning-levels
 dsh plugin --profile web remove dsh-session-delete
 dsh plugin --profile web remove dsh-session-nav
+dsh plugin --profile web remove dsh-softui-skin
 ```
 
 Uninstalling fully restores the original state. Note data (`$DSH_HOME/storages/dsh-note.json`) is kept by default — delete the file manually if you want it gone; after removing `dsh-reasoning-levels`, you may clean the `reasoningEfforts` / `reasoning` / `compat.supportsReasoningEffort` fields the plugin wrote under `llm-pi-ai` in `settings.yaml`.
 
 ## Compatibility & security
 
-- Client only consumes official slots: `conversation.input.left`, `conversation.session.header.actions`, `conversation.chat.assistant-actions`, etc. (`dsh-session-nav` is pure client: it only reads DOM contracts and the `sessions` service, mounts no slot)
+- Client only consumes official slots: `conversation.input.left`, `conversation.session.header.actions`, `conversation.chat.assistant-actions`, `settings.general.item`, etc. (`dsh-session-nav` is pure client: it only reads DOM contracts and the `sessions` service, mounts no slot; `dsh-softui-skin` is pure client too: only the `settings.general.item` slot and the theme service, no host route)
 - Host only adds dedicated API routes (`/plugins/dsh-note/api`, `/plugins/api-balance/api`, `/plugins/reasoning-levels/api`, `/plugins/session-delete/api`); no core state is modified or subscribed.
 - All API routes enforce same-origin checks (loopback Host + exact Origin/Host match), rejecting cross-site and DNS-rebinding requests.
 - No telemetry; no sensitive data beyond credentials is read; nothing is sent to third parties.
